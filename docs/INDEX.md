@@ -60,6 +60,18 @@ docs/
 
 ---
 
+## 🛡️ Quality Assurance & Security
+**Location:** `docs/qa/`
+
+- **[SECURITY_TEST_REPORT.md](./qa/SECURITY_TEST_REPORT.md)** - Security audit & automated testing report
+  - OTP Brute Force protection results
+  - Identity switching prevention
+  - Rate limiting verification
+  - Automated test instructions
+
+
+---
+
 ## 🎯 Quick Start
 
 ### 1. Install Dependencies

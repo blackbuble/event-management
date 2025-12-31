@@ -4,6 +4,13 @@ use App\Http\Controllers\Web\AuthController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
+Route::get('/language/{locale}', function ($locale) {
+    if (in_array($locale, ['id', 'en'])) {
+        session()->put('locale', $locale);
+    }
+    return back();
+})->name('language.switch');
+
 Route::get('/', function () {
     return Inertia::render('Welcome');
 });

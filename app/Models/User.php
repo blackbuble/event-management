@@ -8,9 +8,11 @@ use Laravel\Sanctum\HasApiTokens;
 use App\Traits\HasUuid;
 use Spatie\Permission\Traits\HasRoles;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
 class User extends Authenticatable
 {
-    use HasApiTokens, Notifiable, SoftDeletes, HasUuid, HasRoles;
+    use HasApiTokens, Notifiable, SoftDeletes, HasUuid, HasRoles, HasFactory;
 
     protected $fillable = [
         'name',
@@ -21,10 +23,6 @@ class User extends Authenticatable
         'avatar',
         'website',
         'uuid',
-        'otp',
-        'otp_expires_at',
-        'social_id',
-        'social_type',
         'social_avatar',
     ];
 

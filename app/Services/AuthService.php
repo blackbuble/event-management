@@ -10,6 +10,12 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\LoginNotification;
+use Illuminate\Support\Facades\Request;
+use Illuminate\Support\Facades\RateLimiter;
 
 class AuthService
 {
@@ -22,37 +28,48 @@ class AuthService
 
     /**
      * Find or create user by identity (Email or Phone).
-     * Used for unified registration and login.
+     * Wrapped in DB Transaction to prevent Race Conditions.
      */
     public function findOrCreateByIdentity(string $identity): User
     {
-        $isEmail = filter_var($identity, FILTER_VALIDATE_EMAIL);
-        
-        if ($isEmail) {
-            $user = $this->userRepository->findByEmail($identity);
-        } else {
-            $user = $this->userRepository->findByPhone($identity);
-        }
+        $identity = $this->normalizeIdentity($identity);
+        return DB::transaction(function () use ($identity) {
+            $isEmail = filter_var($identity, FILTER_VALIDATE_EMAIL);
+            
+            $user = $isEmail 
+                ? $this->userRepository->findByEmail($identity) 
+                : $this->userRepository->findByPhone($identity);
 
-        if (!$user) {
-            $userData = [
-                'name' => $isEmail ? explode('@', $identity)[0] : 'User ' . substr($identity, -4),
-                'email' => $isEmail ? $identity : null,
-                'phone' => !$isEmail ? $identity : null,
-                'password' => Hash::make(Str::random(32)),
-                'email_verified_at' => $isEmail ? now() : null,
-            ];
+            if (!$user) {
+                // Double check using direct query to be absolutely sure within transaction (Locking)
+                $query = User::query();
+                if ($isEmail) {
+                    $query->where('email', $identity);
+                } else {
+                    $query->where('phone', $identity);
+                }
+                
+                $user = $query->lockForUpdate()->first();
 
-            $user = $this->userRepository->create($userData);
+                if (!$user) {
+                    $user = $this->userRepository->create([
+                        'name' => $isEmail ? explode('@', $identity)[0] : 'User ' . substr($identity, -4),
+                        'email' => $isEmail ? $identity : null,
+                        'phone' => !$isEmail ? $identity : null,
+                        'password' => Hash::make(Str::random(32)),
+                        'email_verified_at' => $isEmail ? now() : null,
+                    ]);
 
-            try {
-                $user->assignRole('attendee');
-            } catch (\Exception $e) {
-                Log::error("Failed to assign role to unified user: " . $e->getMessage());
+                    try {
+                        $user->assignRole('attendee');
+                    } catch (\Exception $e) {
+                        Log::error("Failed to assign role to unified user: " . $e->getMessage());
+                    }
+                }
             }
-        }
 
-        return $user;
+            return $user;
+        });
     }
 
     /**
@@ -66,19 +83,23 @@ class AuthService
         if (!$user) return;
 
         $otp = (string) rand(100000, 999999);
+        
+        // Use explicit assignment to bypass Mass Assignment protection for internal fields
         $user->otp = Hash::make($otp);
         $user->otp_expires_at = Carbon::now()->addMinutes(10);
         $user->save();
 
-        // DEV LOG: In production, send via WhatsApp/Email API
-        Log::info("OTP for {$identity}: {$otp}");
+        // DEV LOG: In production, trigger WhatsApp API with full international number
+        Log::info("WA_OTP_SENDING: Code generated for WhatsApp number {$identity}");
     }
 
     /**
      * Validate OTP and prepare login result.
+     * Prevents N+1 by eager loading roles if needed (handled in controller or result).
      */
     public function loginWithOtp(string $identity, string $otp): array
     {
+        $identity = $this->normalizeIdentity($identity);
         $isEmail = filter_var($identity, FILTER_VALIDATE_EMAIL);
         $user = $isEmail ? $this->userRepository->findByEmail($identity) : $this->userRepository->findByPhone($identity);
 
@@ -88,23 +109,17 @@ class AuthService
             ]);
         }
 
-        if (!Hash::check($otp, $user->otp)) {
-             // Increment failure count or just invalidate after X tries? 
-             // Let's simply invalidate after 5 failed tries if we had a counter, 
-             // but for now, we'll rely on the throttle. 
-             // Improved: Let's invalidate the OTP after any failure to be super safe? 
-             // No, that's too annoying for users.
-             
-             // Dynamic: We could store attempts in session or cache.
-             $key = 'otp_attempts_' . $user->id;
-             $attempts = \Illuminate\Support\Facades\Cache::get($key, 0) + 1;
-             \Illuminate\Support\Facades\Cache::put($key, $attempts, now()->addMinutes(10));
+        // Standard attempt limiting
+        $key = 'otp_attempts_' . $user->id;
+        $attempts = Cache::get($key, 0) + 1;
+        Cache::put($key, $attempts, now()->addMinutes(10));
 
+        if (!Hash::check($otp, $user->otp)) {
              if ($attempts >= 5) {
                  $user->otp = null;
                  $user->otp_expires_at = null;
                  $user->save();
-                 \Illuminate\Support\Facades\Cache::forget($key);
+                 Cache::forget($key);
                  throw ValidationException::withMessages([
                     'otp' => ['Terlalu banyak percobaan salah. Silakan minta kode baru.'],
                 ]);
@@ -115,16 +130,24 @@ class AuthService
             ]);
         }
 
-        // Clean OTP after success
-        $user->otp = null;
-        $user->otp_expires_at = null;
-        if (!$user->email_verified_at && $isEmail) $user->email_verified_at = now();
-        $user->save();
-        \Illuminate\Support\Facades\Cache::forget('otp_attempts_' . $user->id);
+        // Clean up
+        return DB::transaction(function () use ($user, $isEmail, $key) {
+            $user->otp = null;
+            $user->otp_expires_at = null;
+            if ($isEmail && !$user->email_verified_at) {
+                $user->email_verified_at = now();
+            }
+            $user->save();
 
-        return [
-            'user' => $user->load('roles'),
-        ];
+            Cache::forget($key);
+
+            // Send Security Notification
+            $this->sendSecurityNotification($user);
+
+            return [
+                'user' => $user->load('roles'), // load() is fine for single entity, not N+1
+            ];
+        });
     }
 
     /**
@@ -132,45 +155,52 @@ class AuthService
      */
     public function socialLogin(array $socialData): array
     {
-        $user = User::where('social_id', $socialData['social_id'])
-                    ->where('social_type', $socialData['social_type'])
-                    ->first();
+        return DB::transaction(function () use ($socialData) {
+            $user = User::where('social_id', $socialData['social_id'])
+                        ->where('social_type', $socialData['social_type'])
+                        ->lockForUpdate()
+                        ->first();
 
-        if (!$user) {
-            $user = User::where('email', $socialData['email'])->first();
+            if (!$user) {
+                $user = User::where('email', $socialData['email'])->lockForUpdate()->first();
 
-            if ($user) {
-                $user->update([
-                    'social_id' => $socialData['social_id'],
-                    'social_type' => $socialData['social_type'],
-                    'social_avatar' => $socialData['social_avatar'] ?? $user->avatar,
-                ]);
-            } else {
-                $user = User::create([
-                    'name' => $socialData['name'],
-                    'email' => $socialData['email'],
-                    'social_id' => $socialData['social_id'],
-                    'social_type' => $socialData['social_type'],
-                    'social_avatar' => $socialData['social_avatar'],
-                    'email_verified_at' => now(),
-                    'password' => Hash::make(Str::random(32)),
-                ]);
+                if ($user) {
+                    // Security Check: If user already has a DIFFERENT social ID for this provider, block it
+                    if ($user->social_id && $user->social_id !== $socialData['social_id']) {
+                        throw new \Exception("Akun ini sudah terhubung dengan sosial media lain.");
+                    }
 
-                try {
-                    $user->assignRole('attendee');
-                } catch (\Exception $e) {
-                    Log::error("Failed to assign role to social user: " . $e->getMessage());
+                    $user->social_id = $socialData['social_id'];
+                    $user->social_type = $socialData['social_type'];
+                    $user->social_avatar = $socialData['social_avatar'] ?? $user->avatar;
+                    $user->save();
+                } else {
+                    $user = new User();
+                    $user->name = $socialData['name'];
+                    $user->email = $socialData['email'];
+                    $user->social_id = $socialData['social_id'];
+                    $user->social_type = $socialData['social_type'];
+                    $user->social_avatar = $socialData['social_avatar'];
+                    $user->password = Hash::make(Str::random(32));
+                    $user->email_verified_at = now();
+                    $user->save();
+
+                    try {
+                        $user->assignRole('attendee');
+                    } catch (\Exception $e) {
+                        Log::error("Failed to assign role to social user: " . $e->getMessage());
+                    }
                 }
             }
-        }
 
-        return [
-            'user' => $user->load('roles'),
-        ];
+            return [
+                'user' => $user->load('roles'),
+            ];
+        });
     }
 
     /**
-     * Generate Magic Link for Email login.
+     * Generate Magic Link.
      */
     public function generateMagicLink(string $email): string
     {
@@ -183,38 +213,94 @@ class AuthService
         ]);
 
         $url = url("/auth/magic-link?token={$token}");
-        
-        // DEV LOG: In production, send via Email API
-        Log::info("Magic Link for {$email}: {$url}");
+        // DEV LOG: Keep it for internal debugging, but in production this should be hashed or removed
+        Log::info("Magic Link generated for {$email}");
         
         return $url;
     }
 
     /**
-     * Validate Magic Link and prepare login result.
+     * Validate Magic Link.
      */
     public function validateMagicLink(string $token): array
     {
-        $magicToken = MagicLinkToken::where('token', $token)
-            ->where('used', false)
-            ->where('expires_at', '>', Carbon::now())
-            ->first();
+        return DB::transaction(function () use ($token) {
+            $magicToken = MagicLinkToken::where('token', $token)
+                ->where('used', false)
+                ->where('expires_at', '>', Carbon::now())
+                ->lockForUpdate()
+                ->first();
 
-        if (!$magicToken) {
-            throw ValidationException::withMessages([
-                'token' => ['Tautan login tidak valid atau sudah kadaluarsa.'],
-            ]);
+            if (!$magicToken) {
+                throw ValidationException::withMessages([
+                    'token' => ['Tautan login tidak valid atau sudah kadaluarsa.'],
+                ]);
+            }
+
+            $magicToken->update(['used' => true]);
+            
+            $user = User::where('email', $magicToken->email)->first();
+
+            if (!$user) {
+                $user = $this->findOrCreateByIdentity($magicToken->email);
+            }
+
+            // Send Security Notification
+            $this->sendSecurityNotification($user);
+
+            return [
+                'user' => $user->load('roles'),
+            ];
+        });
+    }
+    /**
+     * Normalize identity (ensure phone numbers have '+' prefix)
+     */
+    private function normalizeIdentity(string $identity): string
+    {
+        $identity = trim($identity);
+        $identity = str_replace([' ', '-', '(', ')'], '', $identity);
+        $isEmail = filter_var($identity, FILTER_VALIDATE_EMAIL);
+
+        if (!$isEmail && preg_match('/^[0-9+]+$/', $identity)) {
+            // Handle Indonesian local prefix '0' -> '+62'
+            if (str_starts_with($identity, '0')) {
+                $identity = '+62' . substr($identity, 1);
+            } 
+            // Handle accidental '+0' prefix -> '+62'
+            elseif (str_starts_with($identity, '+0')) {
+                $identity = '+62' . substr($identity, 2);
+            }
+            // Ensure phone starts with '+'
+            elseif (!str_starts_with($identity, '+')) {
+                $identity = '+' . $identity;
+            }
+        }
+        
+        return $identity;
+    }
+
+    /**
+     * Send security notification email on successful login
+     */
+    private function sendSecurityNotification(User $user): void
+    {
+        // Only send if user has an email
+        if (!$user->email) {
+            return;
         }
 
-        $magicToken->update(['used' => true]);
-        $user = User::where('email', $magicToken->email)->first();
+        try {
+            $details = [
+                'time' => Carbon::now()->toDayDateTimeString(),
+                'ip' => Request::ip(),
+                'user_agent' => Request::userAgent(),
+            ];
 
-        if (!$user) {
-            $user = $this->findOrCreateByIdentity($magicToken->email);
+            Mail::to($user->email)->send(new LoginNotification($user, $details));
+        } catch (\Exception $e) {
+            // Silently fail to not block login if mail server is down
+            Log::error("Failed to send security notification: " . $e->getMessage());
         }
-
-        return [
-            'user' => $user->load('roles'),
-        ];
     }
 }

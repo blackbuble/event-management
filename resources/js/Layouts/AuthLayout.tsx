@@ -1,4 +1,5 @@
 import React from 'react';
+import { usePage } from '@inertiajs/react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface AuthLayoutProps {
@@ -14,8 +15,24 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitle }) =>
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
-                className="w-full max-w-[420px] space-y-8"
+                className="w-full max-w-[420px] space-y-8 relative"
             >
+                {/* Language Switcher - Positioned Top Right */}
+                <div className="fixed top-6 right-6 flex space-x-2 z-50">
+                    {['id', 'en'].map((lang) => (
+                        <a
+                            key={lang}
+                            href={route('language.switch', lang)}
+                            className={`w-9 h-9 flex items-center justify-center rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${(usePage().props as any).locale === lang
+                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
+                                : 'bg-white dark:bg-slate-900 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 border border-slate-200 dark:border-slate-800 shadow-sm'
+                                }`}
+                        >
+                            {lang}
+                        </a>
+                    ))}
+                </div>
+
                 {/* Logo or Brand */}
                 <div className="flex flex-col items-center justify-center space-y-2">
                     <div className="h-14 w-14 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-xl shadow-indigo-500/20 rotate-3 transform hover:rotate-0 transition-transform duration-300">

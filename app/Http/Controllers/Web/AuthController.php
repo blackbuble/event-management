@@ -7,6 +7,8 @@ use App\Services\AuthService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -27,16 +29,25 @@ class AuthController extends Controller
 
     /**
      * Unified authentication entry point (Email or WhatsApp)
-     * Handles both login and registration automatically.
      */
     public function authenticate(Request $request)
     {
         $request->validate([
             'identity' => 'required|string',
         ]);
-
+        
         $identity = $request->identity;
         $isEmail = filter_var($identity, FILTER_VALIDATE_EMAIL);
+
+        // EXTRA SECURITY: Identity-based rate limiting (per phone/email)
+        $throttleKey = 'auth_gate_' . Str::slug($identity);
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+            return back()->withErrors([
+                'identity' => "Terlalu banyak percobaan. Silakan coba lagi dalam {$seconds} detik."
+            ]);
+        }
+        RateLimiter::hit($throttleKey, 60);
 
         // Find or create user
         $user = $this->authService->findOrCreateByIdentity($identity);
@@ -45,9 +56,12 @@ class AuthController extends Controller
             $this->authService->generateMagicLink($user->email);
             return back()->with('message', 'Tautan login telah dikirim ke email Anda.');
         } else {
+            // Store identity in session for security
+            $request->session()->put('auth_identity', $identity);
+            
             // For phone, generate OTP
             $this->authService->generateOtp($user->email ?? $user->phone);
-            return redirect()->route('otp.login', ['phone' => $identity])->with('message', 'Kode verifikasi telah dikirim ke WhatsApp Anda.');
+            return redirect()->route('otp.login')->with('message', 'Kode verifikasi telah dikirim ke WhatsApp Anda.');
         }
     }
 
@@ -56,8 +70,14 @@ class AuthController extends Controller
      */
     public function showOtp(Request $request)
     {
+        $identity = $request->session()->get('auth_identity');
+
+        if (!$identity) {
+            return redirect()->route('login')->withErrors(['identity' => 'Sesi verifikasi telah berakhir. Silakan masuk kembali.']);
+        }
+
         return Inertia::render('Auth/VerifyOtp', [
-            'identity' => $request->phone
+            'identity' => $identity
         ]);
     }
 
@@ -66,18 +86,26 @@ class AuthController extends Controller
      */
     public function otpLogin(Request $request)
     {
+        $identity = $request->session()->get('auth_identity');
+
+        if (!$identity) {
+            return redirect()->route('login')->withErrors(['identity' => 'Sesi verifikasi telah berakhir. Silakan masuk kembali.']);
+        }
+
         $request->validate([
-            'identity' => 'required|string',
             'otp' => 'required|string|size:6',
         ]);
 
         try {
-            $result = $this->authService->loginWithOtp($request->identity, $request->otp);
+            $result = $this->authService->loginWithOtp($identity, $request->otp);
             
             Auth::login($result['user']);
+            $request->session()->forget('auth_identity');
             $request->session()->regenerate();
 
             return redirect()->intended('/dashboard');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return back()->withErrors(['otp' => $e->getMessage()]);
         }

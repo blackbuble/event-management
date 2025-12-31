@@ -1,13 +1,17 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import AuthLayout from '@/Layouts/AuthLayout';
 import { Button } from '@/Components/Form';
-import { authTexts } from '@/config/auth-texts';
+import { authTexts, Language, defaultLanguage } from '@/config/auth-texts';
+import countries from '@/config/countries.json';
 import { motion } from 'framer-motion';
 import { ArrowLeft, MessageSquare, Mail, RefreshCcw, Sparkles } from 'lucide-react';
 
 const VerifyOtp = () => {
-    const { identity, flash } = usePage().props as any;
+    const { identity, flash, locale } = usePage().props as any;
+    const currentLang = (locale as Language) || defaultLanguage;
+    const t = authTexts[currentLang].otp;
+
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [timer, setTimer] = useState(60);
     const [canResend, setCanResend] = useState(false);
@@ -17,6 +21,30 @@ const VerifyOtp = () => {
         identity: identity || '',
         otp: '',
     });
+
+    // Helper to get flag URL from FlagCDN
+    const getFlagUrl = (isoCode: string) => {
+        return `https://flagcdn.com/w80/${isoCode.toLowerCase()}.png`;
+    };
+
+    // Detect country flag for phone identity
+    const identityDisplay = useMemo(() => {
+        if (!identity || identity.includes('@')) return { type: 'email', value: identity, flagUrl: null };
+
+        // Match dial code to find flag
+        const matchedCountry = countries.find(c => identity.startsWith(c.dial_code));
+        if (matchedCountry) {
+            return {
+                type: 'phone',
+                flagUrl: getFlagUrl(matchedCountry.code),
+                prefix: matchedCountry.dial_code,
+                number: identity.replace(matchedCountry.dial_code, ''),
+                full: identity,
+                countryName: matchedCountry.name
+            };
+        }
+        return { type: 'phone', value: identity, flagUrl: null };
+    }, [identity]);
 
     // Handle timer
     useEffect(() => {
@@ -101,21 +129,44 @@ const VerifyOtp = () => {
         });
     };
 
-    const isEmail = identity?.includes('@');
+    const isEmail = identityDisplay.type === 'email';
 
     return (
         <AuthLayout
-            title="Verifikasi Akun"
-            subtitle={`Kami telah mengirimkan kode 6-digit ke ${isEmail ? 'email' : 'WhatsApp'} Anda.`}
+            title={t.title}
+            subtitle={isEmail ? t.subtitle_email : t.subtitle_phone}
         >
             <Head title="Verifikasi" />
 
             <div className="flex flex-col items-center space-y-8">
-                <div className="flex items-center space-x-3 p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
-                    {isEmail ? <Mail className="text-indigo-600" size={20} /> : <MessageSquare className="text-green-500" size={20} />}
-                    <span className="text-sm font-black text-slate-700 dark:text-slate-200 tracking-wider transition-all">
-                        {identity}
-                    </span>
+                <div className="flex items-center space-x-3 p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
+                    {isEmail ? (
+                        <Mail className="text-indigo-600" size={20} />
+                    ) : (
+                        <div className="w-6 h-4 overflow-hidden rounded-sm flex-shrink-0 bg-slate-200">
+                            {identityDisplay.flagUrl ? (
+                                <img
+                                    src={identityDisplay.flagUrl}
+                                    alt={identityDisplay.countryName}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <MessageSquare className="text-green-500" size={16} />
+                            )}
+                        </div>
+                    )}
+                    <div className="text-sm font-black text-slate-700 dark:text-slate-200 tracking-wider">
+                        {isEmail ? identityDisplay.value : (
+                            <div className="flex items-center space-x-2">
+                                <span className="px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded text-[10px] border border-indigo-100 dark:border-indigo-800">
+                                    {identityDisplay.prefix}
+                                </span>
+                                <span className="text-slate-900 dark:text-white">
+                                    {identityDisplay.number}
+                                </span>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {flash?.message && (
@@ -147,7 +198,7 @@ const VerifyOtp = () => {
 
                     {errors.otp && (
                         <p className="text-center text-sm font-bold text-red-500 animate-bounce">
-                            {errors.otp}
+                            {errors.otp.includes('Terlalu banyak') ? authTexts[currentLang].otp.invalid_otp : errors.otp}
                         </p>
                     )}
 
@@ -158,13 +209,13 @@ const VerifyOtp = () => {
                             isLoading={processing}
                             disabled={otp.some(v => v === '')}
                         >
-                            Verifikasi & Masuk
+                            {t.submit_button}
                         </Button>
 
                         <div className="text-center">
                             <div className="flex flex-col items-center space-y-2">
                                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest leading-loose">
-                                    {authTexts.otp.resend_text}
+                                    {t.resend_text}
                                 </p>
                                 <button
                                     type="button"
@@ -177,7 +228,7 @@ const VerifyOtp = () => {
                                 >
                                     <RefreshCcw size={14} className={processing ? 'animate-spin' : ''} />
                                     <span>
-                                        {canResend ? authTexts.otp.resend_link : `Kirim Ulang dalam ${timer}s`}
+                                        {canResend ? t.resend_link : t.resend_wait.replace('{timer}', timer.toString())}
                                     </span>
                                 </button>
                             </div>
@@ -188,7 +239,7 @@ const VerifyOtp = () => {
                 <div className="w-full pt-8 border-t border-slate-100 dark:border-slate-800/50">
                     <Link href={route('login')} className="flex items-center justify-center text-xs font-black text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-[0.2em] group">
                         <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
-                        Ganti Identitas
+                        {t.change_identity}
                     </Link>
                 </div>
             </div>

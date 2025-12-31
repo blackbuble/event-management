@@ -12,7 +12,9 @@ Route::get('/', function () {
 Route::middleware('guest')->group(function () {
     // Single gate for both Login and Register
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-    Route::post('/login', [AuthController::class, 'authenticate'])->name('auth.unified');
+    Route::post('/login', [AuthController::class, 'authenticate'])
+        ->middleware('throttle:5,1')
+        ->name('auth.unified');
     
     // Alias for register to point to login
     Route::get('/register', function() {
@@ -21,7 +23,8 @@ Route::middleware('guest')->group(function () {
 
     // Verification Flow
     Route::get('/otp/login', [AuthController::class, 'showOtp'])->name('otp.login');
-    Route::post('/otp/login', [AuthController::class, 'otpLogin']);
+    Route::post('/otp/login', [AuthController::class, 'otpLogin'])
+        ->middleware('throttle:5,1');
     Route::get('/auth/magic-link', [AuthController::class, 'authViaMagicLink'])->name('magic.verify');
 
     // Social Authentication

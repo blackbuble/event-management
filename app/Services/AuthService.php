@@ -89,8 +89,29 @@ class AuthService
         }
 
         if (!Hash::check($otp, $user->otp)) {
+             // Increment failure count or just invalidate after X tries? 
+             // Let's simply invalidate after 5 failed tries if we had a counter, 
+             // but for now, we'll rely on the throttle. 
+             // Improved: Let's invalidate the OTP after any failure to be super safe? 
+             // No, that's too annoying for users.
+             
+             // Dynamic: We could store attempts in session or cache.
+             $key = 'otp_attempts_' . $user->id;
+             $attempts = \Illuminate\Support\Facades\Cache::get($key, 0) + 1;
+             \Illuminate\Support\Facades\Cache::put($key, $attempts, now()->addMinutes(10));
+
+             if ($attempts >= 5) {
+                 $user->otp = null;
+                 $user->otp_expires_at = null;
+                 $user->save();
+                 \Illuminate\Support\Facades\Cache::forget($key);
+                 throw ValidationException::withMessages([
+                    'otp' => ['Terlalu banyak percobaan salah. Silakan minta kode baru.'],
+                ]);
+             }
+
              throw ValidationException::withMessages([
-                'otp' => ['Kode OTP salah.'],
+                'otp' => ['Kode OTP salah. Sisa percobaan: ' . (5 - $attempts)],
             ]);
         }
 
@@ -99,6 +120,7 @@ class AuthService
         $user->otp_expires_at = null;
         if (!$user->email_verified_at && $isEmail) $user->email_verified_at = now();
         $user->save();
+        \Illuminate\Support\Facades\Cache::forget('otp_attempts_' . $user->id);
 
         return [
             'user' => $user->load('roles'),

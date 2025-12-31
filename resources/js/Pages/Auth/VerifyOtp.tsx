@@ -13,7 +13,7 @@ const VerifyOtp = () => {
     const [canResend, setCanResend] = useState(false);
     const inputs = useRef<(HTMLInputElement | null)[]>([]);
 
-    const { data, setData, post, processing, errors } = useForm({
+    const { data, setData, post, processing, errors, reset } = useForm({
         identity: identity || '',
         otp: '',
     });
@@ -32,27 +32,55 @@ const VerifyOtp = () => {
         return () => clearInterval(interval);
     }, [timer]);
 
+    // Update form data when local otp state changes
     useEffect(() => {
         setData('otp', otp.join(''));
     }, [otp]);
 
+    // Auto-clear OTP on error
+    useEffect(() => {
+        if (errors.otp) {
+            setOtp(['', '', '', '', '', '']);
+            inputs.current[0]?.focus();
+        }
+    }, [errors]);
+
     const handleChange = (element: HTMLInputElement, index: number) => {
-        if (isNaN(Number(element.value))) return false;
+        const value = element.value.replace(/[^0-9]/g, '');
+        if (value.length > 1) return; // Prevent multi-character input in single box
 
         const newOtp = [...otp];
-        newOtp[index] = element.value;
+        newOtp[index] = value;
         setOtp(newOtp);
 
         // Focus next input
-        if (element.value !== '' && index < 5) {
+        if (value !== '' && index < 5) {
             inputs.current[index + 1]?.focus();
         }
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
-        if (e.key === 'Backspace' && index > 0 && otp[index] === '') {
-            inputs.current[index - 1]?.focus();
+        if (e.key === 'Backspace') {
+            if (otp[index] === '' && index > 0) {
+                inputs.current[index - 1]?.focus();
+            }
         }
+    };
+
+    const handlePaste = (e: React.ClipboardEvent) => {
+        e.preventDefault();
+        const pastedData = e.clipboardData.getData('text').slice(0, 6).replace(/[^0-9]/g, '');
+        const newOtp = [...otp];
+
+        pastedData.split('').forEach((char, index) => {
+            if (index < 6) newOtp[index] = char;
+        });
+
+        setOtp(newOtp);
+
+        // Focus the appropriate input after paste
+        const nextIndex = pastedData.length < 6 ? pastedData.length : 5;
+        inputs.current[nextIndex]?.focus();
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -63,7 +91,6 @@ const VerifyOtp = () => {
     const handleResend = () => {
         if (!canResend) return;
 
-        // Reuse unified authenticate route to resend OTP
         post(route('auth.unified'), {
             onSuccess: () => {
                 setTimer(60);
@@ -105,12 +132,15 @@ const VerifyOtp = () => {
                                 key={index}
                                 whileFocus={{ scale: 1.05 }}
                                 type="text"
+                                inputMode="numeric"
+                                autoComplete="one-time-code"
                                 maxLength={1}
                                 ref={(el) => { inputs.current[index] = el; }}
                                 value={digit}
+                                onPaste={handlePaste}
                                 onChange={(e) => handleChange(e.target, index)}
                                 onKeyDown={(e) => handleKeyDown(e, index)}
-                                className="w-12 h-14 md:w-14 md:h-16 text-center text-xl font-black bg-white dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all duration-200 shadow-sm"
+                                className="w-12 h-14 md:w-14 md:h-16 text-center text-2xl font-black bg-white dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all duration-200 shadow-sm text-slate-900 dark:text-white"
                             />
                         ))}
                     </div>

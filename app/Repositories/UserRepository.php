@@ -39,4 +39,15 @@ class UserRepository
     {
         return User::where('uuid', $uuid)->first();
     }
+
+    /**
+     * Find a user by phone number.
+     *
+     * @param string $phone
+     * @return User|null
+     */
+    public function findByPhone(string $phone): ?User
+    {
+        return User::where('phone', $phone)->first();
+    }
 }

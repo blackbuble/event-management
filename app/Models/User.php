@@ -23,12 +23,16 @@ class User extends Authenticatable
         'uuid',
         'otp',
         'otp_expires_at',
+        'social_id',
+        'social_type',
+        'social_avatar',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
         'otp',
+        'social_id',
     ];
 
     protected $casts = [

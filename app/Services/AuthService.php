@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
-use Spatie\Permission\Models\Role;
+use App\Models\MagicLinkToken;
 use App\Repositories\UserRepository;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
@@ -21,108 +21,178 @@ class AuthService
     }
 
     /**
-     * Register a new user.
+     * Find or create user by identity (Email or Phone).
+     * Used for unified registration and login.
      */
-    public function register(array $data): array
+    public function findOrCreateByIdentity(string $identity): User
     {
-        $data['password'] = Hash::make($data['password']);
+        $isEmail = filter_var($identity, FILTER_VALIDATE_EMAIL);
         
-        $user = $this->userRepository->create($data);
-
-        // Assign default role (Attendee) using Spatie
-        // Ensure roles are seeded (created via Migration/Seeder first)
-        try {
-            $user->assignRole('attendee');
-        } catch (\Spatie\Permission\Exceptions\RoleDoesNotExist $e) {
-            // Handle case if role doesn't exist, maybe create it or log
-            // For now, silently fail or ensure your seeds run
+        if ($isEmail) {
+            $user = $this->userRepository->findByEmail($identity);
+        } else {
+            $user = $this->userRepository->findByPhone($identity);
         }
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        if (!$user) {
+            $userData = [
+                'name' => $isEmail ? explode('@', $identity)[0] : 'User ' . substr($identity, -4),
+                'email' => $isEmail ? $identity : null,
+                'phone' => !$isEmail ? $identity : null,
+                'password' => Hash::make(Str::random(32)),
+                'email_verified_at' => $isEmail ? now() : null,
+            ];
 
-        return [
-            'user' => $user->load('roles'),
-            'token' => $token,
-        ];
+            $user = $this->userRepository->create($userData);
+
+            try {
+                $user->assignRole('attendee');
+            } catch (\Exception $e) {
+                Log::error("Failed to assign role to unified user: " . $e->getMessage());
+            }
+        }
+
+        return $user;
     }
 
     /**
-     * Login with email and password.
+     * Generate OTP for login (WhatsApp/Email).
      */
-    public function login(string $email, string $password): array
+    public function generateOtp(string $identity): void
     {
-        $user = $this->userRepository->findByEmail($email);
+        $isEmail = filter_var($identity, FILTER_VALIDATE_EMAIL);
+        $user = $isEmail ? $this->userRepository->findByEmail($identity) : $this->userRepository->findByPhone($identity);
 
-        if (! $user || ! Hash::check($password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['The provided credentials do not match our records.'],
-            ]);
-        }
-
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return [
-            'user' => $user->load('roles'),
-            'token' => $token,
-        ];
-    }
-
-    /**
-     * Generate OTP for login.
-     */
-    public function generateOtp(string $email): void
-    {
-        $user = $this->userRepository->findByEmail($email);
-
-        if (! $user) {
-            // Optional: Don't reveal user existence
-            return; 
-        }
+        if (!$user) return;
 
         $otp = (string) rand(100000, 999999);
-        $user->otp = Hash::make($otp); // Hash OTP for security
+        $user->otp = Hash::make($otp);
         $user->otp_expires_at = Carbon::now()->addMinutes(10);
         $user->save();
 
-        // Send OTP via Email (or WhatsApp)
-        // Mail::to($user->email)->send(new OtpMail($otp));
-        Log::info("OTP for {$user->email}: {$otp}"); // For Demo/Dev
+        // DEV LOG: In production, send via WhatsApp/Email API
+        Log::info("OTP for {$identity}: {$otp}");
     }
 
     /**
-     * Login with OTP.
+     * Validate OTP and prepare login result.
      */
-    public function loginWithOtp(string $email, string $otp): array
+    public function loginWithOtp(string $identity, string $otp): array
     {
-        $user = $this->userRepository->findByEmail($email);
+        $isEmail = filter_var($identity, FILTER_VALIDATE_EMAIL);
+        $user = $isEmail ? $this->userRepository->findByEmail($identity) : $this->userRepository->findByPhone($identity);
 
-        if (! $user || ! $user->otp || ! $user->otp_expires_at || $user->otp_expires_at->isPast()) {
+        if (!$user || !$user->otp || !$user->otp_expires_at || $user->otp_expires_at->isPast()) {
              throw ValidationException::withMessages([
-                'otp' => ['Invalid or expired OTP.'],
+                'otp' => ['Kode OTP tidak valid atau sudah kadaluarsa.'],
             ]);
         }
 
-        if (! Hash::check($otp, $user->otp)) {
+        if (!Hash::check($otp, $user->otp)) {
              throw ValidationException::withMessages([
-                'otp' => ['Invalid OTP.'],
+                'otp' => ['Kode OTP salah.'],
             ]);
         }
 
-        // Clear OTP
+        // Clean OTP after success
         $user->otp = null;
         $user->otp_expires_at = null;
+        if (!$user->email_verified_at && $isEmail) $user->email_verified_at = now();
         $user->save();
-
-        $token = $user->createToken('auth_token')->plainTextToken;
 
         return [
             'user' => $user->load('roles'),
-            'token' => $token,
         ];
     }
 
-    public function logout(User $user): void
+    /**
+     * Social Authentication logic.
+     */
+    public function socialLogin(array $socialData): array
     {
-        $user->currentAccessToken()->delete();
+        $user = User::where('social_id', $socialData['social_id'])
+                    ->where('social_type', $socialData['social_type'])
+                    ->first();
+
+        if (!$user) {
+            $user = User::where('email', $socialData['email'])->first();
+
+            if ($user) {
+                $user->update([
+                    'social_id' => $socialData['social_id'],
+                    'social_type' => $socialData['social_type'],
+                    'social_avatar' => $socialData['social_avatar'] ?? $user->avatar,
+                ]);
+            } else {
+                $user = User::create([
+                    'name' => $socialData['name'],
+                    'email' => $socialData['email'],
+                    'social_id' => $socialData['social_id'],
+                    'social_type' => $socialData['social_type'],
+                    'social_avatar' => $socialData['social_avatar'],
+                    'email_verified_at' => now(),
+                    'password' => Hash::make(Str::random(32)),
+                ]);
+
+                try {
+                    $user->assignRole('attendee');
+                } catch (\Exception $e) {
+                    Log::error("Failed to assign role to social user: " . $e->getMessage());
+                }
+            }
+        }
+
+        return [
+            'user' => $user->load('roles'),
+        ];
+    }
+
+    /**
+     * Generate Magic Link for Email login.
+     */
+    public function generateMagicLink(string $email): string
+    {
+        $token = Str::random(64);
+        
+        MagicLinkToken::create([
+            'email' => $email,
+            'token' => $token,
+            'expires_at' => Carbon::now()->addMinutes(30),
+        ]);
+
+        $url = url("/auth/magic-link?token={$token}");
+        
+        // DEV LOG: In production, send via Email API
+        Log::info("Magic Link for {$email}: {$url}");
+        
+        return $url;
+    }
+
+    /**
+     * Validate Magic Link and prepare login result.
+     */
+    public function validateMagicLink(string $token): array
+    {
+        $magicToken = MagicLinkToken::where('token', $token)
+            ->where('used', false)
+            ->where('expires_at', '>', Carbon::now())
+            ->first();
+
+        if (!$magicToken) {
+            throw ValidationException::withMessages([
+                'token' => ['Tautan login tidak valid atau sudah kadaluarsa.'],
+            ]);
+        }
+
+        $magicToken->update(['used' => true]);
+        $user = User::where('email', $magicToken->email)->first();
+
+        if (!$user) {
+            $user = $this->findOrCreateByIdentity($magicToken->email);
+        }
+
+        return [
+            'user' => $user->load('roles'),
+        ];
     }
 }

@@ -89,6 +89,11 @@ class AuthService
         $user->otp_expires_at = Carbon::now()->addMinutes(10);
         $user->save();
 
+        if (app()->environment('local')) {
+            Log::info("Login OTP for {$identity} ({$user->id}): {$otp}");
+            return;
+        }
+
         // DEV LOG: In production, trigger WhatsApp API with full international number
         Log::info("WA_OTP_SENDING: Code generated for WhatsApp number {$identity}");
     }
@@ -213,6 +218,12 @@ class AuthService
         ]);
 
         $url = url("/auth/magic-link?token={$token}");
+
+        if (app()->environment('local')) {
+            Log::info("Login Magic Link for {$email}: {$url}");
+            return $url;
+        }
+
         // DEV LOG: Keep it for internal debugging, but in production this should be hashed or removed
         Log::info("Magic Link generated for {$email}");
         

@@ -53,4 +53,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::get('/onboarding', [App\Http\Controllers\Web\OnboardingController::class, 'show'])->name('onboarding.show');
     Route::patch('/onboarding', [App\Http\Controllers\Web\OnboardingController::class, 'update'])->name('onboarding.update');
+
+    Route::resource('organizations', \App\Http\Controllers\OrganizationController::class)->only(['create', 'store', 'show', 'edit', 'update']);
+    Route::post('/organizations/{organization}/switch', [\App\Http\Controllers\OrganizationController::class, 'switch'])->name('organizations.switch');
+    Route::post('/organizations/{organization}/members', [\App\Http\Controllers\OrganizationController::class, 'invite'])->name('organizations.members.invite');
 });

@@ -53,4 +53,16 @@ class User extends Authenticatable
     {
         return $this->hasMany(BookingReservation::class);
     }
+
+    public function ownedOrganizations()
+    {
+        return $this->hasMany(Organization::class, 'user_id');
+    }
+
+    public function organizations()
+    {
+        return $this->belongsToMany(Organization::class, 'model_has_roles', 'model_id', 'organization_id')
+            ->where('model_type', self::class)
+            ->withPivot('role_id');
+    }
 }

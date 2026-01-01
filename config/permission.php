@@ -19,11 +19,11 @@ return [
         'role_pivot_key' => null, // default 'role_id'
         'permission_pivot_key' => null, // default 'permission_id'
         'model_morph_key' => 'model_id',
-        'team_foreign_key' => 'team_id',
+        'team_foreign_key' => 'organization_id',
     ],
 
     'register_permission_check_method' => true,
-    'teams' => false,
+    'teams' => true,
     'display_permission_in_exception' => false,
     'display_role_in_exception' => false,
     'enable_wildcard_permission' => false,

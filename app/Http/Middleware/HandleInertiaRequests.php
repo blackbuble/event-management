@@ -38,7 +38,26 @@ class HandleInertiaRequests extends Middleware
     {
         return array_merge(parent::share($request), [
             'auth' => [
-                'user' => $request->user() ? $request->user()->load('roles') : null,
+                'user' => function () use ($request) {
+                    $user = $request->user();
+                    if (!$user) return null;
+                    
+                    $user->load('roles');
+
+                    // Load organizations (owned + member)
+                    $owned = $user->ownedOrganizations;
+                    $member = $user->organizations;
+                    $allOrgs = $owned->merge($member)->unique('id')->values();
+
+                    $user->setRelation('organizations', $allOrgs);
+
+                    $currentOrgId = session('organization_id');
+                    $currentOrg = $allOrgs->firstWhere('id', $currentOrgId) ?? $allOrgs->first();
+
+                    $user->current_organization = $currentOrg;
+
+                    return $user;
+                },
             ],
             'flash' => [
                 'message' => fn () => $request->session()->get('message'),

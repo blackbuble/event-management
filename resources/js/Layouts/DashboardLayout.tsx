@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link, usePage } from '@inertiajs/react';
 import { LayoutDashboard, Calendar, Users, Settings, LogOut, Bell, Search, Plus, Menu, X } from 'lucide-react';
 
+import OrganizationSwitcher from '@/Components/OrganizationSwitcher';
+
 interface DashboardLayoutProps {
     children: React.ReactNode;
 }
@@ -10,10 +12,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const { auth } = usePage().props as any;
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
+    // Get current organization if available
+    const currentOrg = auth?.user?.current_organization;
+
     const navigation = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, current: route().current('dashboard') },
         { name: 'My Events', href: '#', icon: Calendar, current: false },
-        { name: 'Team', href: '#', icon: Users, current: false },
+        {
+            name: 'Team',
+            href: currentOrg ? route('organizations.show', currentOrg.id) : route('organizations.create'),
+            icon: Users,
+            current: route().current('organizations.show') || route().current('organizations.create')
+        },
         { name: 'Settings', href: '#', icon: Settings, current: false },
     ];
 
@@ -46,8 +56,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         </button>
                     </div>
 
+                    <div className="pt-4 pb-2">
+                        <OrganizationSwitcher />
+                    </div>
+
                     {/* Navigation */}
-                    <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
+                    <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
                         {navigation.map((item) => (
                             <Link
                                 key={item.name}

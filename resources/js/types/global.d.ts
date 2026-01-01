@@ -23,6 +23,7 @@ declare module '@inertiajs/core' {
         flash: {
             message: string | null;
             error: string | null;
+            warning: string | null;
         };
         [key: string]: any;
     }

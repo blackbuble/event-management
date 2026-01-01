@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Web\AuthController;
+use App\Http\Controllers\Web\ProfileController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -45,9 +46,11 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', function () {
         return Inertia::render('Dashboard');
-    })->name('dashboard');
+    })->middleware(['auth', 'verified', 'profile.complete'])->name('dashboard');
 
-    Route::get('/profile', function () {
-        return Inertia::render('Profile/Edit');
-    })->name('profile.edit');
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::get('/onboarding', [App\Http\Controllers\Web\OnboardingController::class, 'show'])->name('onboarding.show');
+    Route::patch('/onboarding', [App\Http\Controllers\Web\OnboardingController::class, 'update'])->name('onboarding.update');
 });

@@ -3,12 +3,18 @@ import '../css/app.css';
 
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { createInertiaApp } from '@inertiajs/react';
+import { createInertiaApp, router } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 
 import { LanguageProvider } from './Components/LanguageContext';
 
 const appName = window.document.getElementsByTagName('title')[0]?.innerText || 'Laravel';
+
+// Handle 419 Session Expiry
+router.on('invalid', (event) => {
+    event.preventDefault();
+    window.location.reload();
+});
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,

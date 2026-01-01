@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { resolve } from 'path';
 
+// Config last updated: 2026-01-01
 export default defineConfig({
     plugins: [
         laravel({

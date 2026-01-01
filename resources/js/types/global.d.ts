@@ -16,6 +16,7 @@ declare module '@inertiajs/core' {
                 id: number;
                 name: string;
                 email: string;
+                phone: string | null;
                 email_verified_at: string;
                 roles: Array<{ name: string }>;
             } | null;

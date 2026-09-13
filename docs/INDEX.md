@@ -63,11 +63,17 @@ docs/
 ## 🛡️ Quality Assurance & Security
 **Location:** `docs/qa/`
 
-- **[SECURITY_TEST_REPORT.md](./qa/SECURITY_TEST_REPORT.md)** - Security audit & automated testing report
+- **[SECURITY_TEST_REPORT.md](./qa/SECURITY_TEST_REPORT.md)** - Security audit & automated testing report (Auth)
   - OTP Brute Force protection results
   - Identity switching prevention
   - Rate limiting verification
   - Automated test instructions
+
+- **[EVENT_CREATION_QA.md](./qa/EVENT_CREATION_QA.md)** - QA & security audit report (Create Event)
+  - 18 feature test + 4 unit test results
+  - Authorization & mass assignment verification
+  - Slug race condition handling
+  - Fix history & outstanding items
 
 
 ---
@@ -113,6 +119,29 @@ php artisan db:seed --class=RoleSeeder
 - ✅ Spatie Laravel Permission integration
 - ✅ Role assignment on registration
 - ✅ Permission checking in controllers & policies
+
+### Event Management
+- ✅ Create event from dashboard (offline / online / hybrid)
+- ✅ Draft or publish on creation
+- ✅ Banner upload with storage handling
+- ✅ Race-safe unique slug generation
+- ✅ Deferred meeting link — add later from My Events
+- ✅ Meeting link delivery to confirmed attendees (email queued + WhatsApp log, provider-ready)
+- ✅ Public event landing page (`/events/{slug}`) with tickets, visibility gating for drafts
+- ✅ Full lifecycle actions in My Events: view / edit / publish / cancel / delete
+- ✅ Landing sticky navbar showing event name + date while scrolling
+- ✅ Correct event times via `APP_TIMEZONE=Asia/Jakarta` (shared `timezone` prop)
+- ✅ Registered attendee count + avatar stack (photo or initials)
+- ✅ Organizer rating (averaged reviews) + past events, with attendee reviews
+
+**Documentation:** [EVENT_MANAGEMENT.md](./features/EVENT_MANAGEMENT.md) - field mapping, architecture flow, security protocols, test coverage
+
+### Dashboard (Real-Time Stats)
+- ✅ Role-aware stats: organizer (events, tickets sold, revenue) / attendee (bookings, tickets, spend)
+- ✅ Recent activity feed from real bookings — zero static placeholders
+- ✅ Create Event button gated server-side via EventPolicy
+
+**Documentation:** [DASHBOARD.md](./features/DASHBOARD.md) - Inertia props contract, repository aggregates, data isolation tests
 
 ---
 

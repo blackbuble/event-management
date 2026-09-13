@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,7 +14,7 @@ class Event extends Model
     protected $fillable = [
         'user_id', 'title', 'slug', 'description', 'image',
         'venue_name', 'venue_address', 'latitude', 'longitude',
-        'start_date', 'end_date', 'status', 'type', 'meeting_link', 'capacity'
+        'start_date', 'end_date', 'status', 'type', 'meeting_link', 'capacity',
     ];
 
     protected $casts = [
@@ -24,15 +25,15 @@ class Event extends Model
     protected static function boot()
     {
         parent::boot();
-        
+
         static::creating(function ($event) {
             if (empty($event->slug)) {
                 $event->slug = Str::slug($event->title);
-                
+
                 // Ensure unique slug
-                $count = static::where('slug', 'like', $event->slug . '%')->count();
+                $count = static::where('slug', 'like', $event->slug.'%')->count();
                 if ($count > 0) {
-                    $event->slug = $event->slug . '-' . ($count + 1);
+                    $event->slug = $event->slug.'-'.($count + 1);
                 }
             }
         });
@@ -59,6 +60,11 @@ class Event extends Model
         return $this->hasMany(BookingReservation::class);
     }
 
+    public function reviews()
+    {
+        return $this->hasMany(EventReview::class);
+    }
+
     // Scopes
     public function scopePublished($query)
     {
@@ -80,12 +86,14 @@ class Event extends Model
 
     public function isFull()
     {
-        if (!$this->capacity) return false;
-        
-        $totalConfirmed = $this->bookings()
-            ->where('status', 'confirmed')
-            ->count();
-            
+        if (! $this->capacity) {
+            return false;
+        }
+
+        $totalConfirmed = $this->relationLoaded('bookings')
+            ? $this->bookings->count()
+            : $this->bookings()->where('status', 'confirmed')->count();
+
         return $totalConfirmed >= $this->capacity;
     }
 

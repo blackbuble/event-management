@@ -20,41 +20,36 @@ class TicketController extends Controller
      * Show create ticket form
      */
     public function create(Event $event)
-    {
-        $this->authorize('update', $event);
-        
-        return view('tickets.create', compact('event'));
-    }
+    {    $this->authorize('update', $event);
+
+    return view('tickets.create', compact('event'));}
 
     /**
      * Store new ticket
      */
     public function store(Request $request, Event $event)
+    {<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
     {
-        $this->authorize('update', $event);
-
-        $validated = $request->validate([
-            'name' => 'required|max:255',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric|min:0',
-            'quantity' => 'required|integer|min:1',
-            'sale_starts' => 'nullable|date',
-            'sale_ends' => 'nullable|date|after:sale_starts',
-            'min_per_order' => 'required|integer|min:1',
-            'max_per_order' => 'required|integer|min:1|gte:min_per_order',
-            'is_active' => 'boolean',
-        ]);
-
-        try {
-            $this->eventService->createTicket($event, $validated);
-
-            return redirect()->route('events.edit', $event)
-                ->with('success', 'Ticket created successfully!');
-        } catch (\Exception $e) {
-            return back()->withInput()
-                ->withErrors(['error' => 'Failed to create ticket: ' . $e->getMessage()]);
-        }
+        Schema::table('tickets', function (Blueprint $table) {
+            $table->unique(['event_id', 'name'], 'tickets_event_id_name_unique');
+        });
     }
+
+    public function down(): void
+    {
+        Schema::table('tickets', function (Blueprint $table) {
+            $table->dropUnique('tickets_event_id_name_unique');
+        });
+    }
+};}
 
     /**
      * Show edit ticket form

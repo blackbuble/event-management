@@ -50,6 +50,107 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
 Input.displayName = 'Input';
 
+interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+    label?: string;
+    error?: string;
+    containerClassName?: string;
+    hint?: string;
+}
+
+export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
+    ({ label, error, className, containerClassName, rows = 4, hint, ...props }, ref) => {
+        return (
+            <div className={cn("space-y-1.5 w-full", containerClassName)}>
+                {label && (
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300 ml-1">
+                        {label}
+                    </label>
+                )}
+                <textarea
+                    ref={ref}
+                    rows={rows}
+                    className={cn(
+                        "w-full px-4 py-2.5 rounded-xl border transition-all duration-200 outline-none resize-y",
+                        "bg-white dark:bg-slate-900",
+                        "border-slate-200 dark:border-slate-800",
+                        "focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10",
+                        "placeholder:text-slate-400 text-slate-900 dark:text-white text-base md:text-sm",
+                        error && "border-red-500 focus:border-red-500 focus:ring-red-500/10",
+                        className
+                    )}
+                    {...props}
+                />
+                {hint && !error && (
+                    <p className="text-xs text-slate-400 ml-1">{hint}</p>
+                )}
+                {error && (
+                    <p className="text-xs font-medium text-red-500 ml-1 animate-in fade-in slide-in-from-top-1">
+                        {error}
+                    </p>
+                )}
+            </div>
+        );
+    }
+);
+
+Textarea.displayName = 'Textarea';
+
+interface SelectOption {
+    value: string;
+    label: string;
+}
+
+interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+    label?: string;
+    error?: string;
+    containerClassName?: string;
+    options: SelectOption[];
+    placeholder?: string;
+}
+
+export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
+    ({ label, error, className, containerClassName, options, placeholder, ...props }, ref) => {
+        return (
+            <div className={cn("space-y-1.5 w-full", containerClassName)}>
+                {label && (
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300 ml-1">
+                        {label}
+                    </label>
+                )}
+                <select
+                    ref={ref}
+                    className={cn(
+                        "w-full px-4 py-2.5 rounded-xl border transition-all duration-200 outline-none appearance-none",
+                        "bg-white dark:bg-slate-900",
+                        "border-slate-200 dark:border-slate-800",
+                        "focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10",
+                        "text-slate-900 dark:text-white text-base md:text-sm",
+                        error && "border-red-500 focus:border-red-500 focus:ring-red-500/10",
+                        className
+                    )}
+                    {...props}
+                >
+                    {placeholder && (
+                        <option value="">{placeholder}</option>
+                    )}
+                    {options.map((option) => (
+                        <option key={option.value} value={option.value}>
+                            {option.label}
+                        </option>
+                    ))}
+                </select>
+                {error && (
+                    <p className="text-xs font-medium text-red-500 ml-1 animate-in fade-in slide-in-from-top-1">
+                        {error}
+                    </p>
+                )}
+            </div>
+        );
+    }
+);
+
+Select.displayName = 'Select';
+
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
     isLoading?: boolean;
     variant?: 'primary' | 'secondary' | 'ghost' | 'danger';

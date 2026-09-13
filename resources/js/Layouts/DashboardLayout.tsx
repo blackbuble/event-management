@@ -12,7 +12,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
     const navigation = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, current: route().current('dashboard') },
-        { name: 'My Events', href: '#', icon: Calendar, current: false },
+        { name: 'My Events', href: '/dashboard/events', icon: Calendar, current: route().current('events.*') },
         { name: 'Team', href: '#', icon: Users, current: false },
         { name: 'Settings', href: '#', icon: Settings, current: false },
     ];

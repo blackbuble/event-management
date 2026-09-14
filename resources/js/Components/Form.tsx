@@ -12,11 +12,12 @@ export function cn(...inputs: ClassValue[]) {
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
     label?: string;
     error?: string;
+    hint?: string;
     containerClassName?: string;
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-    ({ label, error, className, containerClassName, type = 'text', ...props }, ref) => {
+    ({ label, error, hint, className, containerClassName, type = 'text', ...props }, ref) => {
         return (
             <div className={cn("space-y-1.5 w-full", containerClassName)}>
                 {label && (
@@ -38,6 +39,9 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
                     )}
                     {...props}
                 />
+                {hint && !error && (
+                    <p className="text-xs text-slate-400 ml-1">{hint}</p>
+                )}
                 {error && (
                     <p className="text-xs font-medium text-red-500 ml-1 animate-in fade-in slide-in-from-top-1">
                         {error}

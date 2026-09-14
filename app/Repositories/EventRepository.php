@@ -164,21 +164,31 @@ class EventRepository
     }
 
     /**
-     * Create an event inside a database transaction with race-safe unique slug generation.
+     * Create an event (and its initial ticket types) inside a database transaction
+     * with race-safe unique slug generation.
      */
     public function create(array $attributes): Event
     {
-        return DB::transaction(function () use ($attributes) {
+        $tickets = $attributes['tickets'] ?? [];
+        unset($attributes['tickets']);
+
+        return DB::transaction(function () use ($attributes, $tickets) {
             $attributes['slug'] = $this->generateUniqueSlug($attributes['title']);
 
             try {
-                return Event::create($attributes);
+                $event = Event::create($attributes);
             } catch (UniqueConstraintViolationException) {
                 // Slug collided despite the pessimistic lock (gap-lock miss). Retry with random suffix.
                 $attributes['slug'] = $this->randomSlug($attributes['title']);
 
-                return Event::create($attributes);
+                $event = Event::create($attributes);
             }
+
+            if (! empty($tickets)) {
+                $event->tickets()->createMany($tickets);
+            }
+
+            return $event;
         });
     }
 

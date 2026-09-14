@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,8 +12,8 @@ class BookingTicket extends Model
 
     protected $fillable = [
         'booking_id', 'ticket_id', 'ticket_code', 'quantity',
-        'price', 'attendee_name', 'attendee_email',
-        'checked_in', 'checked_in_at'
+        'price', 'attendee_name', 'attendee_email', 'attendee_phone',
+        'checked_in', 'checked_in_at',
     ];
 
     protected $casts = [
@@ -24,10 +25,10 @@ class BookingTicket extends Model
     protected static function boot()
     {
         parent::boot();
-        
+
         static::creating(function ($bookingTicket) {
             if (empty($bookingTicket->ticket_code)) {
-                $bookingTicket->ticket_code = 'TK-' . strtoupper(Str::random(12));
+                $bookingTicket->ticket_code = 'TK-'.strtoupper(Str::random(12));
             }
         });
     }
@@ -46,7 +47,7 @@ class BookingTicket extends Model
     // Helper methods
     public function canCheckIn()
     {
-        return !$this->checked_in 
+        return ! $this->checked_in
             && $this->booking->status === 'confirmed'
             && $this->booking->payment_status === 'paid';
     }

@@ -1,5 +1,9 @@
 <?php
 
+use App\Http\Middleware\BookingAccess;
+use App\Http\Middleware\EnsureProfileComplete;
+use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\SetLocale;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -13,11 +17,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'profile.complete' => \App\Http\Middleware\EnsureProfileComplete::class,
+            'profile.complete' => EnsureProfileComplete::class,
+            'booking.access' => BookingAccess::class,
         ]);
         $middleware->web(append: [
-            \App\Http\Middleware\SetLocale::class,
-            \App\Http\Middleware\HandleInertiaRequests::class,
+            SetLocale::class,
+            HandleInertiaRequests::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

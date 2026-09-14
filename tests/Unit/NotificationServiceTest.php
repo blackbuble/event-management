@@ -6,6 +6,7 @@ use App\Mail\MeetingLinkNotification;
 use App\Models\Event;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Services\WhatsAppQuotaService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -39,7 +40,7 @@ class NotificationServiceTest extends TestCase
 
         $user = new User(['name' => 'Budi', 'email' => 'budi@example.com']);
 
-        $channels = (new NotificationService)->sendMeetingLink($user, $this->event());
+        $channels = (new NotificationService(app(WhatsAppQuotaService::class)))->sendMeetingLink($user, $this->event());
 
         $this->assertSame(['emailed' => true, 'whatsapped' => false], $channels);
         Mail::assertQueued(MeetingLinkNotification::class, 1);
@@ -61,7 +62,7 @@ class NotificationServiceTest extends TestCase
 
         $user = new User(['name' => 'Sinta', 'phone' => '+628123456789']);
 
-        $channels = (new NotificationService)->sendMeetingLink($user, $this->event());
+        $channels = (new NotificationService(app(WhatsAppQuotaService::class)))->sendMeetingLink($user, $this->event());
 
         $this->assertSame(['emailed' => false, 'whatsapped' => true], $channels);
         Mail::assertNothingQueued();
@@ -74,7 +75,7 @@ class NotificationServiceTest extends TestCase
 
         $user = new User(['name' => 'Ghost']);
 
-        $channels = (new NotificationService)->sendMeetingLink($user, $this->event());
+        $channels = (new NotificationService(app(WhatsAppQuotaService::class)))->sendMeetingLink($user, $this->event());
 
         $this->assertSame(['emailed' => false, 'whatsapped' => false], $channels);
         Mail::assertNothingQueued();

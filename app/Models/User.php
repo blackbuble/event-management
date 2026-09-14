@@ -1,18 +1,18 @@
 <?php
+
 namespace App\Models;
 
+use App\Traits\HasUuid;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Laravel\Sanctum\HasApiTokens;
-use App\Traits\HasUuid;
 use Spatie\Permission\Traits\HasRoles;
-
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, Notifiable, SoftDeletes, HasUuid, HasRoles, HasFactory;
+    use HasApiTokens, HasFactory, HasRoles, HasUuid, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -37,6 +37,7 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
         'otp_expires_at' => 'datetime',
+        'whatsapp_quota' => 'integer',
     ];
 
     public function events()

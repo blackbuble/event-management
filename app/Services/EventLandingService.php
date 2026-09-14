@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\EventCategory;
 use App\Models\Event;
 use App\Models\EventReview;
 use App\Models\User;
@@ -45,6 +46,9 @@ class EventLandingService
             'slug' => $event->slug,
             'description' => $event->description,
             'type' => $event->type,
+            'category' => $event->category,
+            'category_label' => EventCategory::tryFrom((string) $event->category)?->label(app()->getLocale())
+                ?? EventCategory::Other->label(app()->getLocale()),
             'status' => $event->status,
             'image_url' => $event->image ? Storage::disk('public')->url($event->image) : null,
             'venue_name' => $event->venue_name,
@@ -62,6 +66,7 @@ class EventLandingService
                 'avatars' => $this->mapAttendeeAvatars($event->id),
             ],
             'tickets' => $this->mapTickets($event),
+            'can_book' => $viewer !== null && (int) $viewer->id !== (int) $event->user_id,
             'can_review' => $this->reviewService->canReview($event, $viewer),
             'my_review' => $this->mapReview($this->reviewService->myReview($event, $viewer)),
         ];

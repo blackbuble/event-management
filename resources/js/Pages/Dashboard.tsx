@@ -1,7 +1,7 @@
 import React from 'react';
 import { Head, Link, usePage } from '@inertiajs/react';
 import DashboardLayout from '@/Layouts/DashboardLayout';
-import { Plus, Calendar, Tag, DollarSign, Wallet, CheckCircle2, Inbox } from 'lucide-react';
+import { Plus, Calendar, Tag, DollarSign, Wallet, CheckCircle2, Inbox, MessageCircle } from 'lucide-react';
 import { dashboardTexts, DashboardLanguage, defaultDashboardLanguage } from '@/config/dashboard-texts';
 
 interface OrganizerStats {
@@ -144,13 +144,22 @@ export default function Dashboard() {
                         </p>
                     </div>
                     {canCreateEvent && (
-                        <Link
-                            href={route('events.create')}
-                            className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg font-medium text-sm transition-all shadow-sm shadow-indigo-500/20 active:scale-95"
-                        >
-                            <Plus size={18} />
-                            <span>{t.header.create_event}</span>
-                        </Link>
+                        <div className="flex items-center gap-2">
+                            <Link
+                                href={route('whatsapp.index')}
+                                className="flex items-center justify-center space-x-2 bg-white border border-slate-200 text-slate-700 hover:border-emerald-300 hover:text-emerald-700 px-4 py-2.5 rounded-lg font-medium text-sm transition-all"
+                            >
+                                <MessageCircle size={18} />
+                                <span>{t.header.whatsapp}</span>
+                            </Link>
+                            <Link
+                                href={route('events.create')}
+                                className="flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg font-medium text-sm transition-all shadow-sm shadow-indigo-500/20 active:scale-95"
+                            >
+                                <Plus size={18} />
+                                <span>{t.header.create_event}</span>
+                            </Link>
+                        </div>
                     )}
                 </div>
 

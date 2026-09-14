@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Enums\EventCategory;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\StoreEventRequest;
 use App\Http\Requests\Web\UpdateEventRequest;
 use App\Http\Requests\Web\UpdateMeetingLinkRequest;
 use App\Models\Event;
+use App\Services\EventAnalyticsService;
 use App\Services\EventLandingService;
 use App\Services\EventService;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -19,7 +21,20 @@ class EventController extends Controller
     public function __construct(
         private readonly EventService $eventService,
         private readonly EventLandingService $eventLandingService,
+        private readonly EventAnalyticsService $eventAnalyticsService,
     ) {}
+
+    /**
+     * Organizer analytics for a single event (sales, quota, timeline).
+     */
+    public function analytics(Event $event)
+    {
+        Gate::authorize('update', $event);
+
+        return Inertia::render('Events/Analytics', [
+            'analytics' => $this->eventAnalyticsService->forEvent($event),
+        ]);
+    }
 
     /**
      * Public event landing page. Published events are visible to everyone;
@@ -63,7 +78,9 @@ class EventController extends Controller
     {
         Gate::authorize('create', Event::class);
 
-        return Inertia::render('Events/Create');
+        return Inertia::render('Events/Create', [
+            'categories' => EventCategory::options(app()->getLocale()),
+        ]);
     }
 
     /**
@@ -110,11 +127,13 @@ class EventController extends Controller
         Gate::authorize('update', $event);
 
         return Inertia::render('Events/Edit', [
+            'categories' => EventCategory::options(app()->getLocale()),
             'event' => [
                 'id' => $event->id,
                 'title' => $event->title,
                 'description' => $event->description,
                 'type' => $event->type,
+                'category' => $event->category,
                 'venue_name' => $event->venue_name,
                 'venue_address' => $event->venue_address,
                 'meeting_link' => $event->meeting_link,
@@ -124,7 +143,9 @@ class EventController extends Controller
                 'end_date' => $event->end_date?->format('Y-m-d\TH:i'),
                 'capacity' => $event->capacity,
                 'status' => $event->status,
+                'whatsapp_enabled' => (bool) $event->whatsapp_enabled,
                 'image_url' => $event->image ? \Storage::disk('public')->url($event->image) : null,
+                'tickets' => $this->eventService->ticketsForEvent($event),
             ],
         ]);
     }
@@ -134,7 +155,12 @@ class EventController extends Controller
      */
     public function update(UpdateEventRequest $request, Event $event)
     {
-        $this->eventService->updateEvent($event, $request->validated());
+        try {
+            $this->eventService->updateEvent($event, $request->validated());
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->route('events.edit', $event)
+                ->with('error', $e->getMessage());
+        }
 
         $message = app()->getLocale() === 'id'
             ? 'Event "'.$event->title.'" berhasil diperbarui.'

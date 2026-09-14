@@ -2,15 +2,17 @@
 
 namespace App\Http\Controllers\Web;
 
-use App\Enums\EventCategory;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\StoreEventRequest;
 use App\Http\Requests\Web\UpdateEventRequest;
 use App\Http\Requests\Web\UpdateMeetingLinkRequest;
+use App\Models\Category;
+use App\Models\City;
 use App\Models\Event;
 use App\Services\EventAnalyticsService;
 use App\Services\EventLandingService;
 use App\Services\EventService;
+use App\Services\VisitTrackingService;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -22,6 +24,7 @@ class EventController extends Controller
         private readonly EventService $eventService,
         private readonly EventLandingService $eventLandingService,
         private readonly EventAnalyticsService $eventAnalyticsService,
+        private readonly VisitTrackingService $visitTrackingService,
     ) {}
 
     /**
@@ -52,6 +55,11 @@ class EventController extends Controller
             abort(404);
         }
 
+        // Track external visitors for audience analytics (owner/admin views excluded).
+        if (! ($user && $user->can('update', $event))) {
+            $this->visitTrackingService->record(request(), $event);
+        }
+
         return Inertia::render('Events/Show', [
             'event' => $this->eventLandingService->getEventPageData($event, $user),
             'is_owner' => (bool) ($user && $user->can('update', $event)),
@@ -79,7 +87,8 @@ class EventController extends Controller
         Gate::authorize('create', Event::class);
 
         return Inertia::render('Events/Create', [
-            'categories' => EventCategory::options(app()->getLocale()),
+            'categories' => $this->categoryOptions(),
+            'cities' => $this->cityOptions(),
         ]);
     }
 
@@ -127,13 +136,15 @@ class EventController extends Controller
         Gate::authorize('update', $event);
 
         return Inertia::render('Events/Edit', [
-            'categories' => EventCategory::options(app()->getLocale()),
+            'categories' => $this->categoryOptions(),
+            'cities' => $this->cityOptions(),
             'event' => [
                 'id' => $event->id,
                 'title' => $event->title,
                 'description' => $event->description,
                 'type' => $event->type,
                 'category' => $event->category,
+                'city' => $event->city,
                 'venue_name' => $event->venue_name,
                 'venue_address' => $event->venue_address,
                 'meeting_link' => $event->meeting_link,
@@ -298,5 +309,33 @@ class EventController extends Controller
                 : 'This event has already ended — the link cannot be sent.',
             default => null,
         };
+    }
+
+    /**
+     * Active categories (admin-managed) as form options, locale-aware.
+     *
+     * @return array<int, array{value: string, label: string}>
+     */
+    private function categoryOptions(): array
+    {
+        $locale = app()->getLocale();
+
+        return Category::query()
+            ->active()
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Category $category) => [
+                'value' => $category->slug,
+                'label' => $category->label($locale),
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function cityOptions(): array
+    {
+        return City::query()->active()->orderBy('name')->pluck('name')->all();
     }
 }

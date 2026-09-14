@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Middleware\BookingAccess;
+use App\Http\Middleware\EnsureAccountIsActive;
+use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureProfileComplete;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\SetLocale;
@@ -16,13 +18,19 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Trust the front proxy/LB so `$request->ip()` reads X-Forwarded-For
+        // (real client IP) instead of the proxy address.
+        $middleware->trustProxies(at: '*');
+
         $middleware->alias([
             'profile.complete' => EnsureProfileComplete::class,
             'booking.access' => BookingAccess::class,
+            'admin' => EnsureAdmin::class,
         ]);
         $middleware->web(append: [
             SetLocale::class,
             HandleInertiaRequests::class,
+            EnsureAccountIsActive::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

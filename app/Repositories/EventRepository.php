@@ -44,6 +44,7 @@ class EventRepository
     {
         return Event::query()
             ->where('user_id', $organizerId)
+            ->with('categoryModel')
             ->withCount([
                 'bookings' => fn (Builder $query) => $query->confirmed(),
             ])

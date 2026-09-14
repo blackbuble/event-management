@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,21 +11,22 @@ class Booking extends Model
 
     protected $fillable = [
         'booking_number', 'user_id', 'event_id', 'status',
-        'total_amount', 'payment_method', 'payment_status',
-        'payment_intent_id', 'cancellation_reason'
+        'total_amount', 'platform_fee', 'payment_method', 'payment_status',
+        'payment_intent_id', 'cancellation_reason',
     ];
 
     protected $casts = [
         'total_amount' => 'decimal:2',
+        'platform_fee' => 'decimal:2',
     ];
 
     protected static function boot()
     {
         parent::boot();
-        
+
         static::creating(function ($booking) {
             if (empty($booking->booking_number)) {
-                $booking->booking_number = 'BK-' . strtoupper(uniqid());
+                $booking->booking_number = 'BK-'.strtoupper(uniqid());
             }
         });
     }
@@ -59,7 +61,7 @@ class Booking extends Model
     // Helper methods
     public function canBeCancelled()
     {
-        return in_array($this->status, ['pending', 'confirmed']) 
+        return in_array($this->status, ['pending', 'confirmed'])
             && $this->event->start_date->isFuture();
     }
 

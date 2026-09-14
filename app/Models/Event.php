@@ -14,7 +14,7 @@ class Event extends Model
     protected $fillable = [
         'user_id', 'title', 'slug', 'description', 'image',
         'venue_name', 'venue_address', 'latitude', 'longitude',
-        'start_date', 'end_date', 'status', 'type', 'category', 'meeting_link', 'capacity',
+        'start_date', 'end_date', 'status', 'type', 'category', 'city', 'meeting_link', 'capacity',
         'whatsapp_enabled',
     ];
 
@@ -45,6 +45,11 @@ class Event extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function categoryModel()
+    {
+        return $this->belongsTo(Category::class, 'category', 'slug');
     }
 
     public function tickets()

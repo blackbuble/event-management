@@ -2,12 +2,10 @@
 
 namespace App\Http\Requests\Web;
 
-use App\Enums\EventCategory;
 use App\Http\Requests\Web\Concerns\ValidatesTicketFields;
 use App\Models\Event;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class StoreEventRequest extends FormRequest
 {
@@ -33,7 +31,8 @@ class StoreEventRequest extends FormRequest
             'image' => ['nullable', 'image', 'max:2048'],
 
             'type' => ['required', 'in:online,offline,hybrid'],
-            'category' => ['required', Rule::enum(EventCategory::class)],
+            'category' => ['required', 'string', 'exists:categories,slug'],
+            'city' => ['nullable', 'string', 'max:100'],
             'venue_name' => ['nullable', 'required_unless:type,online', 'string', 'max:255'],
             'venue_address' => ['nullable', 'required_unless:type,online', 'string', 'max:1000'],
             'meeting_link' => ['nullable', 'url', 'max:255'],

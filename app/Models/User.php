@@ -35,10 +35,16 @@ class User extends Authenticatable
 
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'suspended_at' => 'datetime',
         'password' => 'hashed',
         'otp_expires_at' => 'datetime',
         'whatsapp_quota' => 'integer',
     ];
+
+    public function isSuspended(): bool
+    {
+        return $this->suspended_at !== null;
+    }
 
     public function events()
     {

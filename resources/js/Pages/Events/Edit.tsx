@@ -10,9 +10,10 @@ interface EventEditProps {
     id: number;
     title: string;
     description: string;
-    type: 'online' | 'offline' | 'hybrid';
-    category: string;
-    venue_name: string;
+        type: 'online' | 'offline' | 'hybrid';
+        category: string;
+        city: string | null;
+        venue_name: string;
     venue_address: string;
     meeting_link: string | null;
     latitude: number | null;
@@ -27,7 +28,7 @@ interface EventEditProps {
 }
 
 export default function EditEvent() {
-    const { locale, flash, event, categories } = usePage().props as any;
+    const { locale, flash, event, categories, cities } = usePage().props as any;
     const currentLang = (locale as EventLanguage) || defaultEventLanguage;
     const t = eventTexts[currentLang];
     const eventRow = event as EventEditProps;
@@ -50,6 +51,7 @@ export default function EditEvent() {
                         description: eventRow.description,
                         type: eventRow.type,
                         category: eventRow.category,
+                        city: eventRow.city ?? '',
                         venue_name: eventRow.venue_name,
                         venue_address: eventRow.venue_address,
                         meeting_link: eventRow.meeting_link ?? '',
@@ -63,6 +65,7 @@ export default function EditEvent() {
                         tickets: eventRow.tickets ?? [],
                     }}
                     categories={categories ?? []}
+                    cities={cities ?? []}
                     existingImageUrl={eventRow.image_url}
                     submitUrl={route('events.update', eventRow.id)}
                     method="patch"

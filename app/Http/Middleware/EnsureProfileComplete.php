@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureProfileComplete
@@ -11,13 +12,25 @@ class EnsureProfileComplete
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
+            return $next($request);
+        }
+
+        // Skip profile gating while an admin is impersonating — support staff
+        // must be able to see the account as-is, not be forced through onboarding.
+        if ($request->session()->has('impersonator_id')) {
+            Log::debug('impersonation.profile_gate_skipped', [
+                'user_id' => $user->id,
+                'route' => $request->route()?->getName(),
+                'session_id' => $request->session()->getId(),
+            ]);
+
             return $next($request);
         }
 
@@ -32,9 +45,9 @@ class EnsureProfileComplete
         if ($isDefaultName || empty($user->name) || empty($user->email) || empty($user->phone)) {
             // Prevent infinite loop if already on the onboarding pages
             if (
-                !$request->routeIs('onboarding.*') && 
-                !$request->routeIs('profile.update') && 
-                !$request->routeIs('logout')
+                ! $request->routeIs('onboarding.*') &&
+                ! $request->routeIs('profile.update') &&
+                ! $request->routeIs('logout')
             ) {
                 return redirect()->route('onboarding.show');
             }

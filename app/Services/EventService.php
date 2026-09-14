@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\EventCategory;
 use App\Models\Event;
 use App\Models\Ticket;
 use App\Repositories\EventRepository;
@@ -94,8 +93,8 @@ class EventService
                 'slug' => $event->slug,
                 'type' => $event->type,
                 'category' => $event->category,
-                'category_label' => EventCategory::tryFrom((string) $event->category)?->label(app()->getLocale())
-                    ?? EventCategory::Other->label(app()->getLocale()),
+                'category_label' => $event->categoryModel?->label(app()->getLocale()) ?? $event->category,
+                'city' => $event->city,
                 'status' => $event->status,
                 'start_date' => $event->start_date?->toIso8601String(),
                 'end_date' => $event->end_date?->toIso8601String(),

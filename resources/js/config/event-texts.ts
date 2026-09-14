@@ -6,6 +6,7 @@ export const eventTexts = {
             // Event type
             type_label: 'Jenis Event',
             category_label: 'Kategori Event',
+            city_label: 'Kota',
             type_offline: 'Offline',
             type_offline_desc: 'Event tatap muka di lokasi fisik',
             type_online: 'Online',
@@ -200,6 +201,7 @@ export const eventTexts = {
             subtitle: "Fill in the details of the event you're organizing.",
             type_label: 'Event Type',
             category_label: 'Event Category',
+            city_label: 'City',
             type_offline: 'Offline',
             type_offline_desc: 'In-person event at a physical venue',
             type_online: 'Online',

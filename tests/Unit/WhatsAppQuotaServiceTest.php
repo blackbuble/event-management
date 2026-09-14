@@ -5,12 +5,19 @@ namespace Tests\Unit;
 use App\Enums\PaymentMethod;
 use App\Models\User;
 use App\Services\WhatsAppQuotaService;
+use Database\Seeders\WhatsAppPackageSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class WhatsAppQuotaServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(WhatsAppPackageSeeder::class);
+    }
 
     private function service(): WhatsAppQuotaService
     {

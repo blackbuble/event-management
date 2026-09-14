@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\EventCategory;
 use App\Models\Event;
 use App\Models\EventReview;
 use App\Models\User;
@@ -25,7 +24,7 @@ class EventLandingService
      */
     public function getEventPageData(Event $event, ?User $viewer = null): array
     {
-        $event->loadMissing('user:id,name');
+        $event->loadMissing(['user:id,name', 'categoryModel']);
 
         $organizer = null;
 
@@ -47,8 +46,8 @@ class EventLandingService
             'description' => $event->description,
             'type' => $event->type,
             'category' => $event->category,
-            'category_label' => EventCategory::tryFrom((string) $event->category)?->label(app()->getLocale())
-                ?? EventCategory::Other->label(app()->getLocale()),
+            'category_label' => $event->categoryModel?->label(app()->getLocale()) ?? $event->category,
+            'city' => $event->city,
             'status' => $event->status,
             'image_url' => $event->image ? Storage::disk('public')->url($event->image) : null,
             'venue_name' => $event->venue_name,

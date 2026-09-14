@@ -143,6 +143,22 @@ php artisan db:seed --class=RoleSeeder
 
 **Documentation:** [DASHBOARD.md](./features/DASHBOARD.md) - Inertia props contract, repository aggregates, data isolation tests
 
+### Admin Panel
+- ✅ Password + OTP two-factor admin login (`/admin/login`)
+- ✅ Organizer impersonation (start/stop) with session banner
+- ✅ Payment gateway + WhatsApp provider settings (API/secret keys)
+- ✅ Platform fee configuration (fixed / percent)
+- ✅ Category, city, and WhatsApp package management
+- ✅ Platform analytics (Google Analytics-style): weekly/monthly/yearly events, revenue split (organizer/platform), category breakdown, leaderboards, audience origin (country/city) + devices
+- ✅ User management: search, role/status filter, pagination, suspend/activate, soft delete, organizer impersonation
+
+**Documentation:** [ADMIN_PANEL.md](./features/ADMIN_PANEL.md) - admin auth, impersonation, settings store, catalog CRUD, analytics, tests
+
+### Internationalization
+- ✅ All UI copy grouped through a single registry (`resources/js/config/i18n.ts`)
+
+**Documentation:** [TRANSLATIONS.md](./features/TRANSLATIONS.md) - grouped locale modules, `useTranslations()` hook
+
 ---
 
 ## 🏗️ Architecture

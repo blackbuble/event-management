@@ -15,7 +15,8 @@ Organizers and admins can create events from the dashboard (`/dashboard`) via a 
 | `description` | Description textarea | required, string, max 5000 |
 | `image` | Banner file input | nullable, image, max 2048 KB |
 | `type` | Type card selector | required, `online`/`offline`/`hybrid` |
-| `category` | Category select | required, `App\Enums\EventCategory` (`music`, `sports`, `technology`, `business`, `education`, `arts`, `food`, `community`, `other`); DB default `other` |
+| `category` | Category select | required, `exists:categories,slug` (admin-managed; seeded from `App\Enums\EventCategory`); DB default `other` |
+| `city` | City select | optional, string max 100 (options from admin-managed `cities`) |
 | `venue_name` | Venue name | required unless `type=online` (default `Online Event`) |
 | `venue_address` | Full address textarea | required unless `type=online` (defaults to meeting link) |
 | `latitude` / `longitude` | Collapsible location pin | nullable, numeric, bounded ±90 / ±180 |
@@ -201,6 +202,7 @@ POST /bookings/{booking}/pay             → bookings.pay.store [booking.access:
 - **Self-dealing guard:** organizers cannot buy tickets for their own event — enforced in `BookingService::createBooking` and the transaction page (not just the UI); the landing page hides the buy affordance for the owner (`isBlockedOwner`). Guests and non-owner users can buy without logging in.
 - **Concurrency/idempotency:** booking creation is serialized per `(event,user)` with a distributed lock + `lockForUpdate` on tickets; settlement re-locks the booking and short-circuits when already paid.
 - **Payment gateway:** none wired. Selecting a method records the choice and settles the booking as a **simulated/mock payment** (clearly labelled in the UI). A real gateway drops into `BookingService::pay` / `BookingRepository::markPaid` without touching controllers.
+- **Platform fee:** configured by admins (`/admin/settings`, fixed or percent). `BookingService` adds `SettingsService::platformFeeFor($subtotal)` to the order, stored on `bookings.platform_fee` and included in `bookings.total_amount` (default 0 — no effect until set).
 
 ## Ticket Delivery: Email & WhatsApp + Quota Top-Up
 
@@ -227,7 +229,7 @@ POST /dashboard/whatsapp/topup    → whatsapp.topup   [throttle:10,1] StoreWhat
 ```
 
 - **Data model:** `events.whatsapp_enabled` (bool), `booking_tickets.attendee_phone` (nullable), `users.whatsapp_quota` (unsigned int), `whatsapp_topups` (package, amount, quota, payment_method, status).
-- **Packages:** `config/whatsapp.php` (`starter` 100 / `growth` 500 / `scale` 2000). Single source of truth for pricing + validation; the dashboard renders them locale-aware.
+- **Packages:** `whatsapp_packages` table (admin-managed via `/admin/packages`, seeded from `config/whatsapp.php`: starter 100 / growth 500 / scale 2000). `WhatsAppQuotaService` reads active rows, so admin edits immediately change what organizers can buy.
 - **Quota safety:** `WhatsAppRepository::consume` is a conditional atomic decrement (`where whatsapp_quota >= units`) → a send is skipped instead of going negative. Top-ups credit under a row lock.
 - **Toggle:** `EventForm` exposes “Kirim Tiket via WhatsApp”; persisted through `Store/UpdateEventRequest` (`boolean`) and surfaced on `Events/Edit` as `event.whatsapp_enabled`.
 - **Delivery payload:** the optional WhatsApp number is captured per attendee (`individual`) or once for the representative, and stored on each per-seat `booking_tickets` row.
@@ -236,11 +238,11 @@ POST /dashboard/whatsapp/topup    → whatsapp.topup   [throttle:10,1] StoreWhat
 
 Every event carries a category so listings, discovery and reporting can be filtered.
 
-- **Enum:** `App\Enums\EventCategory` — `music`, `sports`, `technology`, `business`, `education`, `arts`, `food`, `community`, `other` (locale-aware labels via `label()` / `options()`).
-- **Schema:** `events.category` (string, default `other`) so existing/legacy rows are always categorised.
-- **Validation:** required on both create and update (`Rule::enum`); an invalid value is rejected.
-- **Form:** the shared `EventForm` renders a category `Select`; options are passed as the `categories` Inertia prop from `EventController@create`/`@edit`.
-- **Surfaced:** `Events/Index` rows and the `Events/Show` landing badge render `event.category_label`; the analytics payload includes it too.
+- **Source of truth:** the `categories` table (admin-managed via `/admin/categories`), seeded from `App\Enums\EventCategory` (`music`, `sports`, `technology`, `business`, `education`, `arts`, `food`, `community`, `other`).
+- **Schema:** `events.category` (string, default `other`) + `events.city` (nullable). `Event::categoryModel()` relates by slug for locale-aware labels.
+- **Validation:** `category` required on create/update (`exists:categories,slug`); `city` optional.
+- **Form:** the shared `EventForm` renders category + city `Select`s; options come from active `categories`/`cities` passed as the `categories`/`cities` Inertia props from `EventController@create`/`@edit`.
+- **Surfaced:** `Events/Index` rows and the `Events/Show` landing badge render `event.category_label`; the analytics payload includes category + city too.
 
 ## Event Analytics
 

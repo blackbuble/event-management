@@ -22,6 +22,7 @@ class BookingService
         private readonly BookingRepository $bookingRepository,
         private readonly NotificationService $notificationService,
         private readonly UserRepository $userRepository,
+        private readonly SettingsService $settingsService,
     ) {}
 
     /**
@@ -96,7 +97,7 @@ class BookingService
 
         $booking = $lock->block(self::BOOK_LOCK_WAIT, function () use ($event, $buyer, $selections, $attendeeMode, $representative) {
             return DB::transaction(function () use ($event, $buyer, $selections, $attendeeMode, $representative) {
-                $totalAmount = 0;
+                $subtotal = 0;
                 $ticketRows = [];
 
                 foreach ($selections as $selection) {
@@ -109,7 +110,7 @@ class BookingService
                     $quantity = (int) $selection['quantity'];
                     $this->assertTicketSelectable($ticket, $quantity);
 
-                    $totalAmount += $ticket->price * $quantity;
+                    $subtotal += $ticket->price * $quantity;
                     $ticket->increment('quantity_sold', $quantity);
 
                     foreach ($this->attendeesFor($selection, $attendeeMode, $representative) as $attendee) {
@@ -124,6 +125,8 @@ class BookingService
                     }
                 }
 
+                $platformFee = $this->settingsService->platformFeeFor((float) $subtotal);
+                $totalAmount = $subtotal + $platformFee;
                 $isFree = $totalAmount == 0;
 
                 $booking = Booking::create([
@@ -131,6 +134,7 @@ class BookingService
                     'event_id' => $event->id,
                     'status' => $isFree ? 'confirmed' : 'pending',
                     'total_amount' => $totalAmount,
+                    'platform_fee' => $platformFee,
                     'payment_status' => $isFree ? 'paid' : 'unpaid',
                 ]);
 
@@ -192,6 +196,7 @@ class BookingService
             'payment_status' => $booking->payment_status,
             'payment_method' => $booking->payment_method,
             'total_amount' => (float) $booking->total_amount,
+            'platform_fee' => (float) $booking->platform_fee,
             'event' => $booking->event ? [
                 'id' => $booking->event->id,
                 'title' => $booking->event->title,

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\PaymentMethod;
 use App\Models\User;
+use App\Models\WhatsAppPackage;
 use App\Models\WhatsAppTopUp;
 use App\Repositories\WhatsAppRepository;
 
@@ -25,17 +26,17 @@ class WhatsAppQuotaService
      */
     public function packages(string $locale = 'en'): array
     {
-        $isId = $locale === 'id';
-
-        return collect(config('whatsapp.packages', []))
-            ->map(fn (array $package, string $key) => [
-                'key' => $key,
-                'label' => $package['label'],
-                'quota' => (int) $package['quota'],
-                'amount' => (float) $package['amount'],
-                'amount_label' => ($isId ? 'Rp ' : 'Rp ').number_format((float) $package['amount'], 0, ',', '.'),
+        return WhatsAppPackage::query()
+            ->active()
+            ->orderBy('amount')
+            ->get()
+            ->map(fn (WhatsAppPackage $package) => [
+                'key' => $package->slug,
+                'label' => $package->label,
+                'quota' => (int) $package->quota,
+                'amount' => (float) $package->amount,
+                'amount_label' => 'Rp '.number_format((float) $package->amount, 0, ',', '.'),
             ])
-            ->values()
             ->all();
     }
 
@@ -45,7 +46,10 @@ class WhatsAppQuotaService
      */
     public function topUp(User $user, string $packageKey, PaymentMethod $method): WhatsAppTopUp
     {
-        $package = config("whatsapp.packages.{$packageKey}");
+        $package = WhatsAppPackage::query()
+            ->where('slug', $packageKey)
+            ->where('is_active', true)
+            ->first();
 
         if (! $package) {
             throw new \InvalidArgumentException(
@@ -56,9 +60,9 @@ class WhatsAppQuotaService
         }
 
         return $this->whatsAppRepository->credit($user, [
-            'package' => $packageKey,
-            'amount' => $package['amount'],
-            'quota' => $package['quota'],
+            'package' => $package->slug,
+            'amount' => $package->amount,
+            'quota' => $package->quota,
             'payment_method' => $method->value,
         ]);
     }

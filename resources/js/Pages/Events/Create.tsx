@@ -6,7 +6,7 @@ import { eventTexts, EventLanguage, defaultEventLanguage } from '@/config/event-
 import { usePage } from '@inertiajs/react';
 
 export default function CreateEvent() {
-    const { locale, categories } = usePage().props as any;
+    const { locale, categories, cities } = usePage().props as any;
     const currentLang = (locale as EventLanguage) || defaultEventLanguage;
     const t = eventTexts[currentLang].create;
 
@@ -16,6 +16,7 @@ export default function CreateEvent() {
             <EventForm
                 initial={{}}
                 categories={categories ?? []}
+                cities={cities ?? []}
                 submitUrl={route('events.store')}
                 method="post"
                 title={t.title}

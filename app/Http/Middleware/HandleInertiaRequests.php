@@ -44,6 +44,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'locale' => app()->getLocale(),
             'timezone' => config('app.timezone'),
+            'impersonating' => (bool) $request->session()->has('impersonator_id'),
             'ziggy' => function () use ($request) {
                 return array_merge((new Ziggy)->toArray(), [
                     'location' => $request->url(),

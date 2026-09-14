@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\EventCategory;
 use App\Models\Event;
 use App\Models\Ticket;
 use App\Repositories\EventAnalyticsRepository;
@@ -22,6 +21,8 @@ class EventAnalyticsService
      */
     public function forEvent(Event $event, int $timelineDays = 14): array
     {
+        $event->loadMissing('categoryModel');
+
         $booking = $this->analyticsRepository->bookingSummary($event->id);
         $totals = $this->analyticsRepository->ticketTotals($event->id);
         $revenueByTicket = $this->analyticsRepository->paidRevenueByTicket($event->id);
@@ -40,8 +41,8 @@ class EventAnalyticsService
                 'status' => $event->status,
                 'type' => $event->type,
                 'category' => $event->category,
-                'category_label' => EventCategory::tryFrom((string) $event->category)?->label(app()->getLocale())
-                    ?? EventCategory::Other->label(app()->getLocale()),
+                'category_label' => $event->categoryModel?->label(app()->getLocale()) ?? $event->category,
+                'city' => $event->city,
                 'start_date' => $event->start_date?->toIso8601String(),
                 'end_date' => $event->end_date?->toIso8601String(),
             ],

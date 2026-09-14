@@ -81,6 +81,7 @@ interface EventData {
     image_url: string | null;
     venue_name: string | null;
     venue_address: string | null;
+    city: string | null;
     meeting_link: string | null;
     latitude: number | null;
     longitude: number | null;

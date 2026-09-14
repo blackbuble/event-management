@@ -38,6 +38,7 @@ export interface EventFormValues {
     description: string;
     type: EventType;
     category: string;
+    city: string;
     venue_name: string;
     venue_address: string;
     meeting_link: string;
@@ -97,6 +98,7 @@ const normalizeTickets = (tickets?: RawTicket[]): TicketFormValues[] => {
 interface EventFormProps {
     initial: Partial<Omit<EventFormValues, 'tickets'>> & { tickets?: RawTicket[] };
     categories: Array<{ value: string; label: string }>;
+    cities: string[];
     existingImageUrl?: string | null;
     submitUrl: string;
     method: 'post' | 'patch';
@@ -115,7 +117,7 @@ const typeCards: Array<{
     { value: 'hybrid', icon: Globe2, titleKey: 'type_hybrid', descKey: 'type_hybrid_desc' },
 ];
 
-export default function EventForm({ initial, categories, existingImageUrl, submitUrl, method, title, subtitle }: EventFormProps) {
+export default function EventForm({ initial, categories, cities, existingImageUrl, submitUrl, method, title, subtitle }: EventFormProps) {
     const { locale } = usePage().props as any;
     const currentLang = (locale as EventLanguage) || defaultEventLanguage;
     const t = eventTexts[currentLang].create;
@@ -125,6 +127,7 @@ export default function EventForm({ initial, categories, existingImageUrl, submi
         description: initial.description ?? '',
         type: initial.type ?? 'offline',
         category: initial.category ?? categories[0]?.value ?? 'other',
+        city: initial.city ?? '',
         venue_name: initial.venue_name ?? '',
         venue_address: initial.venue_address ?? '',
         meeting_link: initial.meeting_link ?? '',
@@ -263,14 +266,23 @@ export default function EventForm({ initial, categories, existingImageUrl, submi
                         required
                     />
 
-                    <Select
-                        label={t.category_label}
-                        value={data.category}
-                        onChange={(e) => setData('category', e.target.value)}
-                        error={errors.category}
-                        options={categories}
-                        required
-                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Select
+                            label={t.category_label}
+                            value={data.category}
+                            onChange={(e) => setData('category', e.target.value)}
+                            error={errors.category}
+                            options={categories}
+                            required
+                        />
+                        <Select
+                            label={t.city_label}
+                            value={data.city}
+                            onChange={(e) => setData('city', e.target.value)}
+                            error={errors.city}
+                            options={[{ value: '', label: '—' }, ...cities.map((city) => ({ value: city, label: city }))]}
+                        />
+                    </div>
 
                     {/* Banner */}
                     <div className="space-y-1.5">

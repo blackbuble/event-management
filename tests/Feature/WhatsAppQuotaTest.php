@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
+use Database\Seeders\WhatsAppPackageSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
@@ -15,7 +16,7 @@ class WhatsAppQuotaTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(RoleSeeder::class);
+        $this->seed([RoleSeeder::class, WhatsAppPackageSeeder::class]);
     }
 
     private function organizer(int $quota = 0): User

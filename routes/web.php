@@ -1,6 +1,15 @@
 <?php
 
 use App\Http\Controllers\TicketController;
+use App\Http\Controllers\Web\Admin\AdminAuthController;
+use App\Http\Controllers\Web\Admin\AnalyticsController as AdminAnalyticsController;
+use App\Http\Controllers\Web\Admin\CategoryController as AdminCategoryController;
+use App\Http\Controllers\Web\Admin\CityController as AdminCityController;
+use App\Http\Controllers\Web\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Web\Admin\ImpersonationController;
+use App\Http\Controllers\Web\Admin\PackageController as AdminPackageController;
+use App\Http\Controllers\Web\Admin\SettingController as AdminSettingController;
+use App\Http\Controllers\Web\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\BookingController;
 use App\Http\Controllers\Web\DashboardController;
@@ -137,4 +146,66 @@ Route::middleware('auth')->group(function () {
             ->middleware('throttle:10,1')
             ->name('whatsapp.topup');
     });
+
+    // Leave impersonation (available to the impersonated user, not admin-gated).
+    Route::post('/impersonation/stop', [ImpersonationController::class, 'stop'])->name('impersonation.stop');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Admin Panel
+|--------------------------------------------------------------------------
+| Admin login is password + OTP (see AdminAuthController). All panel routes
+| require the `admin` role.
+*/
+Route::prefix('admin')->group(function () {
+    // No `guest` middleware: an authenticated organizer must be able to reach
+    // the admin login and switch into the (separate) admin session.
+    Route::get('/login', [AdminAuthController::class, 'showLogin'])->name('admin.login');
+    Route::post('/login', [AdminAuthController::class, 'login'])
+        ->middleware('throttle:5,1')
+        ->name('admin.login.store');
+    Route::get('/otp', [AdminAuthController::class, 'showOtp'])->name('admin.otp');
+    Route::post('/otp', [AdminAuthController::class, 'verifyOtp'])
+        ->middleware('throttle:5,1')
+        ->name('admin.otp.verify');
+    Route::post('/otp/resend', [AdminAuthController::class, 'resendOtp'])
+        ->middleware('throttle:5,1')
+        ->name('admin.otp.resend');
+});
+
+Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
+    Route::get('/', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
+    Route::get('/analytics', [AdminAnalyticsController::class, 'index'])->name('admin.analytics');
+    Route::get('/users', [AdminUserController::class, 'index'])->name('admin.users');
+    Route::post('/users/{user}/suspend', [AdminUserController::class, 'suspend'])->name('admin.users.suspend');
+    Route::post('/users/{user}/activate', [AdminUserController::class, 'activate'])->name('admin.users.activate');
+    Route::delete('/users/{user}', [AdminUserController::class, 'destroy'])->name('admin.users.destroy');
+    Route::post('/impersonate/{user}', [ImpersonationController::class, 'start'])->name('admin.impersonate');
+    Route::post('/logout', [AdminAuthController::class, 'logout'])->name('admin.logout');
+
+    // Settings
+    Route::get('/settings', [AdminSettingController::class, 'edit'])->name('admin.settings');
+    Route::put('/settings/general', [AdminSettingController::class, 'updateGeneral'])->name('admin.settings.general');
+    Route::put('/settings/payment-gateway', [AdminSettingController::class, 'updatePaymentGateway'])->name('admin.settings.payment');
+    Route::put('/settings/whatsapp', [AdminSettingController::class, 'updateWhatsApp'])->name('admin.settings.whatsapp');
+    Route::put('/settings/platform-fee', [AdminSettingController::class, 'updatePlatformFee'])->name('admin.settings.fee');
+
+    // Categories
+    Route::get('/categories', [AdminCategoryController::class, 'index'])->name('admin.categories');
+    Route::post('/categories', [AdminCategoryController::class, 'store'])->name('admin.categories.store');
+    Route::put('/categories/{category}', [AdminCategoryController::class, 'update'])->name('admin.categories.update');
+    Route::delete('/categories/{category}', [AdminCategoryController::class, 'destroy'])->name('admin.categories.destroy');
+
+    // Cities
+    Route::get('/cities', [AdminCityController::class, 'index'])->name('admin.cities');
+    Route::post('/cities', [AdminCityController::class, 'store'])->name('admin.cities.store');
+    Route::put('/cities/{city}', [AdminCityController::class, 'update'])->name('admin.cities.update');
+    Route::delete('/cities/{city}', [AdminCityController::class, 'destroy'])->name('admin.cities.destroy');
+
+    // WhatsApp packages
+    Route::get('/packages', [AdminPackageController::class, 'index'])->name('admin.packages');
+    Route::post('/packages', [AdminPackageController::class, 'store'])->name('admin.packages.store');
+    Route::put('/packages/{package}', [AdminPackageController::class, 'update'])->name('admin.packages.update');
+    Route::delete('/packages/{package}', [AdminPackageController::class, 'destroy'])->name('admin.packages.destroy');
 });

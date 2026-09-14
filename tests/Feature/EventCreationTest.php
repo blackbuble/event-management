@@ -42,6 +42,7 @@ class EventCreationTest extends TestCase
             'title' => 'Indie Music Festival 2026',
             'description' => 'A full day of independent bands across three stages.',
             'type' => 'offline',
+            'category' => 'music',
             'venue_name' => 'Balai Kartini',
             'venue_address' => 'Jl. Gatot Subroto No. 27, Semarang',
             'latitude' => '-6.966667',
@@ -50,6 +51,17 @@ class EventCreationTest extends TestCase
             'end_date' => now()->addDays(7)->addHours(6)->format('Y-m-d\TH:i'),
             'capacity' => '500',
             'status' => 'draft',
+            'tickets' => [
+                [
+                    'name' => 'Regular',
+                    'description' => 'General admission.',
+                    'price' => '150000',
+                    'quantity' => '100',
+                    'min_per_order' => '1',
+                    'max_per_order' => '5',
+                    'is_active' => true,
+                ],
+            ],
         ], $overrides);
     }
 
@@ -117,6 +129,171 @@ class EventCreationTest extends TestCase
             'status' => 'draft',
             'capacity' => 500,
         ]);
+    }
+
+    public function test_ticket_settings_are_persisted_with_the_event(): void
+    {
+        $organizer = $this->organizer();
+
+        $this->actingAs($organizer)->post(route('events.store'), $this->validEventData([
+            'tickets' => [
+                [
+                    'name' => 'Early Bird',
+                    'description' => 'Limited first release.',
+                    'price' => '99000',
+                    'quantity' => '50',
+                    'sale_starts' => now()->addDay()->format('Y-m-d\TH:i'),
+                    'sale_ends' => now()->addDays(3)->format('Y-m-d\TH:i'),
+                    'min_per_order' => '1',
+                    'max_per_order' => '4',
+                    'is_active' => true,
+                ],
+                [
+                    'name' => 'Regular',
+                    'price' => '0',
+                    'quantity' => '200',
+                    'min_per_order' => '1',
+                    'max_per_order' => '10',
+                    'is_active' => false,
+                ],
+            ],
+        ]))->assertRedirect(route('dashboard'));
+
+        $event = $organizer->events()->first();
+
+        $this->assertNotNull($event);
+        $this->assertSame(2, $event->tickets()->count());
+
+        $this->assertDatabaseHas('tickets', [
+            'event_id' => $event->id,
+            'name' => 'Early Bird',
+            'price' => 99000,
+            'quantity' => 50,
+            'min_per_order' => 1,
+            'max_per_order' => 4,
+            'is_active' => true,
+        ]);
+
+        $this->assertDatabaseHas('tickets', [
+            'event_id' => $event->id,
+            'name' => 'Regular',
+            'price' => 0,
+            'quantity' => 200,
+            'is_active' => false,
+        ]);
+    }
+
+    public function test_event_category_is_required_and_persisted(): void
+    {
+        $organizer = $this->organizer();
+
+        $this->actingAs($organizer)->post(route('events.store'), $this->validEventData([
+            'category' => 'technology',
+        ]))->assertRedirect(route('dashboard'));
+
+        $this->assertDatabaseHas('events', [
+            'user_id' => $organizer->id,
+            'category' => 'technology',
+        ]);
+
+        $this->actingAs($organizer)
+            ->post(route('events.store'), $this->validEventData([
+                'title' => 'Missing Category',
+                'category' => null,
+                'start_date' => now()->addDays(20)->format('Y-m-d\TH:i'),
+                'end_date' => now()->addDays(20)->addHours(3)->format('Y-m-d\TH:i'),
+            ]))
+            ->assertSessionHasErrors('category');
+    }
+
+    public function test_invalid_category_is_rejected(): void
+    {
+        $this->actingAs($this->organizer())
+            ->post(route('events.store'), $this->validEventData(['category' => 'gaming']))
+            ->assertSessionHasErrors('category');
+    }
+
+    public function test_whatsapp_delivery_toggle_is_persisted(): void
+    {
+        $organizer = $this->organizer();
+
+        $this->actingAs($organizer)->post(route('events.store'), $this->validEventData([
+            'whatsapp_enabled' => true,
+        ]))->assertRedirect(route('dashboard'));
+
+        $this->assertDatabaseHas('events', [
+            'user_id' => $organizer->id,
+            'whatsapp_enabled' => true,
+        ]);
+    }
+
+    public function test_event_requires_at_least_one_ticket(): void
+    {
+        $this->actingAs($this->organizer())
+            ->post(route('events.store'), $this->validEventData(['tickets' => []]))
+            ->assertSessionHasErrors('tickets');
+
+        $this->assertDatabaseCount('events', 0);
+        $this->assertDatabaseCount('tickets', 0);
+    }
+
+    public function test_ticket_row_validation_rejects_invalid_values(): void
+    {
+        $this->actingAs($this->organizer())
+            ->post(route('events.store'), $this->validEventData([
+                'tickets' => [
+                    ['name' => '', 'price' => '-10', 'quantity' => '0', 'min_per_order' => '1', 'max_per_order' => '10'],
+                ],
+            ]))
+            ->assertSessionHasErrors([
+                'tickets.0.name',
+                'tickets.0.price',
+                'tickets.0.quantity',
+            ]);
+
+        $this->assertDatabaseCount('events', 0);
+    }
+
+    public function test_ticket_max_per_order_must_be_gte_min_per_order(): void
+    {
+        $this->actingAs($this->organizer())
+            ->post(route('events.store'), $this->validEventData([
+                'tickets' => [
+                    ['name' => 'VIP', 'price' => '500000', 'quantity' => '10', 'min_per_order' => '5', 'max_per_order' => '2'],
+                ],
+            ]))
+            ->assertSessionHasErrors('tickets.0.max_per_order');
+    }
+
+    public function test_ticket_sale_window_must_end_after_it_starts(): void
+    {
+        $this->actingAs($this->organizer())
+            ->post(route('events.store'), $this->validEventData([
+                'tickets' => [
+                    [
+                        'name' => 'Regular',
+                        'price' => '100000',
+                        'quantity' => '100',
+                        'sale_starts' => now()->addDays(5)->format('Y-m-d\TH:i'),
+                        'sale_ends' => now()->addDays(2)->format('Y-m-d\TH:i'),
+                        'min_per_order' => '1',
+                        'max_per_order' => '5',
+                    ],
+                ],
+            ]))
+            ->assertSessionHasErrors('tickets.0.sale_ends');
+    }
+
+    public function test_identical_double_submit_does_not_duplicate_tickets(): void
+    {
+        $organizer = $this->organizer();
+        $payload = $this->validEventData();
+
+        $this->actingAs($organizer)->post(route('events.store'), $payload);
+        $this->actingAs($organizer)->post(route('events.store'), $payload);
+
+        $this->assertSame(1, $organizer->events()->count());
+        $this->assertDatabaseCount('tickets', 1);
     }
 
     public function test_organizer_can_create_online_event_and_venue_defaults_are_applied(): void

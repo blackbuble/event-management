@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\TicketController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\BookingController;
 use App\Http\Controllers\Web\DashboardController;
@@ -7,6 +8,7 @@ use App\Http\Controllers\Web\EventController;
 use App\Http\Controllers\Web\OnboardingController;
 use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Web\ReviewController;
+use App\Http\Controllers\Web\WhatsAppController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -51,10 +53,25 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 // Public Event Landing
 Route::get('/events/{slug}', [EventController::class, 'show'])->name('events.show');
 
-// Ticket Booking (authenticated attendees)
+// Ticket Booking — seamless: guests can buy without an account.
+// Transaction page: enter attendee names before checkout
+Route::get('/events/{event}/book', [BookingController::class, 'create'])
+    ->middleware('throttle:20,1')
+    ->name('bookings.create');
 Route::post('/events/{event}/book', [BookingController::class, 'store'])
-    ->middleware(['auth', 'throttle:10,1'])
+    ->middleware('throttle:10,1')
     ->name('bookings.store');
+
+// Checkout & receipt: owner (policy) OR signed URL emailed to the buyer
+Route::get('/bookings/{booking}', [BookingController::class, 'show'])
+    ->middleware('booking.access:view')
+    ->name('bookings.show');
+Route::get('/bookings/{booking}/pay', [BookingController::class, 'pay'])
+    ->middleware('booking.access:pay')
+    ->name('bookings.pay');
+Route::post('/bookings/{booking}/pay', [BookingController::class, 'processPayment'])
+    ->middleware(['booking.access:pay', 'throttle:10,1'])
+    ->name('bookings.pay.store');
 
 // Event Reviews (authenticated attendees, eligibility enforced in service)
 Route::post('/events/{event}/reviews', [ReviewController::class, 'store'])
@@ -82,6 +99,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/dashboard/events', [EventController::class, 'store'])
             ->middleware('throttle:10,1')
             ->name('events.store');
+        Route::get('/dashboard/events/{event}/analytics', [EventController::class, 'analytics'])->name('events.analytics');
         Route::get('/dashboard/events/{event}/edit', [EventController::class, 'edit'])->name('events.edit');
         Route::patch('/dashboard/events/{event}', [EventController::class, 'update'])
             ->middleware('throttle:10,1')
@@ -101,5 +119,22 @@ Route::middleware('auth')->group(function () {
         Route::post('/dashboard/events/{event}/meeting-link/send', [EventController::class, 'sendMeetingLink'])
             ->middleware('throttle:5,1')
             ->name('events.meeting-link.send');
+
+        // Ticket type management (event-scoped, owner/admin via Form Request policy)
+        Route::post('/dashboard/events/{event}/tickets', [TicketController::class, 'store'])
+            ->middleware('throttle:10,1')
+            ->name('events.tickets.store');
+        Route::patch('/dashboard/events/{event}/tickets/{ticket}', [TicketController::class, 'update'])
+            ->middleware('throttle:10,1')
+            ->name('events.tickets.update');
+        Route::delete('/dashboard/events/{event}/tickets/{ticket}', [TicketController::class, 'destroy'])
+            ->middleware('throttle:10,1')
+            ->name('events.tickets.destroy');
+
+        // WhatsApp quota (organizer/admin): top up ticket-delivery balance
+        Route::get('/dashboard/whatsapp', [WhatsAppController::class, 'index'])->name('whatsapp.index');
+        Route::post('/dashboard/whatsapp/topup', [WhatsAppController::class, 'topUp'])
+            ->middleware('throttle:10,1')
+            ->name('whatsapp.topup');
     });
 });

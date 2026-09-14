@@ -3,8 +3,10 @@
 namespace Tests\Unit;
 
 use App\Models\Event;
+use App\Models\Ticket;
 use App\Models\User;
 use App\Repositories\EventRepository;
+use App\Repositories\TicketRepository;
 use App\Services\EventService;
 use App\Services\NotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -37,6 +39,11 @@ class EventServiceTest extends TestCase
         return Mockery::mock(NotificationService::class);
     }
 
+    private function ticketRepositoryMock(): TicketRepository
+    {
+        return Mockery::mock(TicketRepository::class);
+    }
+
     public function test_delegates_creation_to_repository_with_owner_set(): void
     {
         $repository = $this->repositoryMock();
@@ -52,7 +59,7 @@ class EventServiceTest extends TestCase
             })
             ->andReturn($expectedEvent);
 
-        $service = new EventService($repository, $this->notificationMock());
+        $service = new EventService($repository, $this->notificationMock(), $this->ticketRepositoryMock());
         $event = $service->createEvent(['title' => 'Test Event'], 42);
 
         $this->assertSame($expectedEvent, $event);
@@ -68,7 +75,7 @@ class EventServiceTest extends TestCase
         $repository->shouldReceive('findRecentDuplicate')->once()->andReturn($existing);
         $repository->shouldReceive('create')->never();
 
-        $service = new EventService($repository, $this->notificationMock());
+        $service = new EventService($repository, $this->notificationMock(), $this->ticketRepositoryMock());
         $result = $service->createEvent([
             'title' => 'Webinar Laravel',
             'type' => 'online',
@@ -93,7 +100,7 @@ class EventServiceTest extends TestCase
                 return new Event;
             });
 
-        $service = new EventService($repository, $this->notificationMock());
+        $service = new EventService($repository, $this->notificationMock(), $this->ticketRepositoryMock());
         $service->createEvent([
             'title' => 'Webinar Laravel',
             'type' => 'online',
@@ -118,7 +125,7 @@ class EventServiceTest extends TestCase
                 return new Event;
             });
 
-        $service = new EventService($repository, $this->notificationMock());
+        $service = new EventService($repository, $this->notificationMock(), $this->ticketRepositoryMock());
         $service->createEvent([
             'title' => 'Offline Event',
             'type' => 'offline',
@@ -145,7 +152,7 @@ class EventServiceTest extends TestCase
             })
             ->andReturn(new Event);
 
-        $service = new EventService($repository, $this->notificationMock());
+        $service = new EventService($repository, $this->notificationMock(), $this->ticketRepositoryMock());
         $service->createEvent(['title' => 'Event', 'type' => 'offline', 'image' => $file], 1);
 
         Storage::disk('public')->assertExists(
@@ -164,7 +171,7 @@ class EventServiceTest extends TestCase
             ->with($event, 'https://zoom.us/j/7')
             ->andReturn($updated);
 
-        $service = new EventService($repository, $this->notificationMock());
+        $service = new EventService($repository, $this->notificationMock(), $this->ticketRepositoryMock());
 
         $this->assertSame($updated, $service->updateMeetingLink($event, 'https://zoom.us/j/7'));
     }
@@ -203,7 +210,7 @@ class EventServiceTest extends TestCase
             ->once()->with($emailOnly, $event)
             ->andReturn(['emailed' => true, 'whatsapped' => false]);
 
-        $service = new EventService($repository, $notification);
+        $service = new EventService($repository, $notification, $this->ticketRepositoryMock());
         $counts = $service->sendMeetingLinkToAttendees($event);
 
         $this->assertSame(['emailed' => 2, 'whatsapped' => 2], $counts);
@@ -231,7 +238,7 @@ class EventServiceTest extends TestCase
             ->with(9, 10)
             ->andReturn($paginator);
 
-        $service = new EventService($repository, $this->notificationMock());
+        $service = new EventService($repository, $this->notificationMock(), $this->ticketRepositoryMock());
         $result = $service->listEventsForOrganizer(9);
 
         $this->assertSame(3, $result['events'][0]['id']);
@@ -261,7 +268,7 @@ class EventServiceTest extends TestCase
                 && $attributes['title'] === 'New')
             ->andReturn($updated);
 
-        $service = new EventService($repository, $this->notificationMock());
+        $service = new EventService($repository, $this->notificationMock(), $this->ticketRepositoryMock());
 
         $this->assertSame($updated, $service->updateEvent($event, ['title' => 'New']));
     }
@@ -281,7 +288,7 @@ class EventServiceTest extends TestCase
                 && str_ends_with((string) $attributes['image'], '.jpg'))
             ->andReturn($event);
 
-        $service = new EventService($repository, $this->notificationMock());
+        $service = new EventService($repository, $this->notificationMock(), $this->ticketRepositoryMock());
         $service->updateEvent($event, ['image' => $file]);
 
         Storage::disk('public')->assertMissing('events/old.jpg');
@@ -295,7 +302,7 @@ class EventServiceTest extends TestCase
         $published = new Event(['status' => 'published']);
         $repository->shouldReceive('changeStatus')->once()->with($draft, 'published')->andReturn($published);
 
-        $service = new EventService($repository, $this->notificationMock());
+        $service = new EventService($repository, $this->notificationMock(), $this->ticketRepositoryMock());
         $this->assertSame($published, $service->publishEvent($draft));
 
         $this->expectException(\InvalidArgumentException::class);
@@ -310,10 +317,79 @@ class EventServiceTest extends TestCase
         $cancelled = new Event(['status' => 'cancelled']);
         $repository->shouldReceive('changeStatus')->once()->with($live, 'cancelled')->andReturn($cancelled);
 
-        $service = new EventService($repository, $this->notificationMock());
+        $service = new EventService($repository, $this->notificationMock(), $this->ticketRepositoryMock());
         $this->assertSame($cancelled, $service->cancelEvent($live));
 
         $this->expectException(\InvalidArgumentException::class);
         $service->cancelEvent($cancelled);
+    }
+
+    public function test_create_event_passes_ticket_payload_to_repository(): void
+    {
+        $repository = $this->repositoryMock();
+        $tickets = [['name' => 'VIP', 'price' => '500000', 'quantity' => '10']];
+
+        $repository->shouldReceive('findRecentDuplicate')->once()->andReturn(null);
+        $repository->shouldReceive('create')
+            ->once()
+            ->withArgs(fn (array $attributes) => ($attributes['tickets'] ?? null) === $tickets)
+            ->andReturn(new Event);
+
+        $service = new EventService($repository, $this->notificationMock(), $this->ticketRepositoryMock());
+        $event = $service->createEvent(['title' => 'Festival', 'tickets' => $tickets], 1);
+
+        $this->assertInstanceOf(Event::class, $event);
+    }
+
+    public function test_update_event_syncs_nested_tickets_through_repository(): void
+    {
+        $event = new Event(['title' => 'Old']);
+        $updated = new Event(['title' => 'New']);
+        $tickets = [['id' => 7, 'name' => 'VIP', 'price' => '500000', 'quantity' => '10']];
+
+        $repository = $this->repositoryMock();
+        $repository->shouldReceive('update')
+            ->once()
+            ->withArgs(fn (Event $target, array $attributes) => $target === $event && ! array_key_exists('tickets', $attributes))
+            ->andReturn($updated);
+
+        $ticketRepository = $this->ticketRepositoryMock();
+        $ticketRepository->shouldReceive('syncForEvent')->once()->with($updated, $tickets);
+
+        $service = new EventService($repository, $this->notificationMock(), $ticketRepository);
+
+        $this->assertSame($updated, $service->updateEvent($event, ['title' => 'New', 'tickets' => $tickets]));
+    }
+
+    public function test_update_event_without_tickets_leaves_ticket_repository_untouched(): void
+    {
+        $event = new Event(['title' => 'Old']);
+        $updated = new Event(['title' => 'New']);
+
+        $repository = $this->repositoryMock();
+        $repository->shouldReceive('update')->once()->andReturn($updated);
+
+        $ticketRepository = $this->ticketRepositoryMock();
+        $ticketRepository->shouldNotReceive('syncForEvent');
+
+        $service = new EventService($repository, $this->notificationMock(), $ticketRepository);
+
+        $this->assertSame($updated, $service->updateEvent($event, ['title' => 'New']));
+    }
+
+    public function test_create_ticket_delegates_to_ticket_repository(): void
+    {
+        $event = new Event;
+        $event->id = 5;
+
+        $ticketRepository = $this->ticketRepositoryMock();
+        $ticketRepository->shouldReceive('createForEvent')
+            ->once()
+            ->with($event, ['name' => 'VIP'])
+            ->andReturn(new Ticket(['name' => 'VIP']));
+
+        $service = new EventService($this->repositoryMock(), $this->notificationMock(), $ticketRepository);
+
+        $this->assertSame('VIP', $service->createTicket($event, ['name' => 'VIP'])->name);
     }
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useForm, usePage } from '@inertiajs/react';
-import { Input, Textarea, Button } from '@/Components/Form';
+import { Input, Textarea, Button, Select } from '@/Components/Form';
 import { eventTexts, EventLanguage, defaultEventLanguage } from '@/config/event-texts';
 import {
     MapPin,
@@ -12,14 +12,32 @@ import {
     Save,
     Rocket,
     ArrowLeft,
+    Plus,
+    Trash2,
+    Ticket as TicketIcon,
+    ChevronDown,
 } from 'lucide-react';
 
 export type EventType = 'offline' | 'online' | 'hybrid';
+
+export interface TicketFormValues {
+    id?: number;
+    name: string;
+    description: string;
+    price: string;
+    quantity: string;
+    sale_starts: string;
+    sale_ends: string;
+    min_per_order: string;
+    max_per_order: string;
+    is_active: boolean;
+}
 
 export interface EventFormValues {
     title: string;
     description: string;
     type: EventType;
+    category: string;
     venue_name: string;
     venue_address: string;
     meeting_link: string;
@@ -29,11 +47,56 @@ export interface EventFormValues {
     end_date: string;
     capacity: string;
     status: 'draft' | 'published';
+    whatsapp_enabled: boolean;
     image: File | null;
+    tickets: TicketFormValues[];
 }
 
+export type RawTicket = Partial<TicketFormValues> & {
+    price?: string | number;
+    quantity?: string | number;
+    min_per_order?: string | number;
+    max_per_order?: string | number;
+};
+
+const emptyTicket = (): TicketFormValues => ({
+    name: '',
+    description: '',
+    price: '0',
+    quantity: '',
+    sale_starts: '',
+    sale_ends: '',
+    min_per_order: '1',
+    max_per_order: '10',
+    is_active: true,
+});
+
+const normalizeTickets = (tickets?: RawTicket[]): TicketFormValues[] => {
+    if (!tickets || tickets.length === 0) {
+        return [emptyTicket()];
+    }
+
+    return tickets.map((ticket) => ({
+        ...emptyTicket(),
+        ...ticket,
+        id: ticket.id,
+        price: ticket.price !== undefined && ticket.price !== null ? String(ticket.price) : '0',
+        quantity: ticket.quantity !== undefined && ticket.quantity !== null ? String(ticket.quantity) : '',
+        min_per_order:
+            ticket.min_per_order !== undefined && ticket.min_per_order !== null
+                ? String(ticket.min_per_order)
+                : '1',
+        max_per_order:
+            ticket.max_per_order !== undefined && ticket.max_per_order !== null
+                ? String(ticket.max_per_order)
+                : '10',
+        is_active: ticket.is_active ?? true,
+    }));
+};
+
 interface EventFormProps {
-    initial: Partial<EventFormValues>;
+    initial: Partial<Omit<EventFormValues, 'tickets'>> & { tickets?: RawTicket[] };
+    categories: Array<{ value: string; label: string }>;
     existingImageUrl?: string | null;
     submitUrl: string;
     method: 'post' | 'patch';
@@ -52,7 +115,7 @@ const typeCards: Array<{
     { value: 'hybrid', icon: Globe2, titleKey: 'type_hybrid', descKey: 'type_hybrid_desc' },
 ];
 
-export default function EventForm({ initial, existingImageUrl, submitUrl, method, title, subtitle }: EventFormProps) {
+export default function EventForm({ initial, categories, existingImageUrl, submitUrl, method, title, subtitle }: EventFormProps) {
     const { locale } = usePage().props as any;
     const currentLang = (locale as EventLanguage) || defaultEventLanguage;
     const t = eventTexts[currentLang].create;
@@ -61,6 +124,7 @@ export default function EventForm({ initial, existingImageUrl, submitUrl, method
         title: initial.title ?? '',
         description: initial.description ?? '',
         type: initial.type ?? 'offline',
+        category: initial.category ?? categories[0]?.value ?? 'other',
         venue_name: initial.venue_name ?? '',
         venue_address: initial.venue_address ?? '',
         meeting_link: initial.meeting_link ?? '',
@@ -70,12 +134,37 @@ export default function EventForm({ initial, existingImageUrl, submitUrl, method
         end_date: initial.end_date ?? '',
         capacity: initial.capacity ?? '',
         status: initial.status ?? 'draft',
+        whatsapp_enabled: initial.whatsapp_enabled ?? false,
         image: null,
+        tickets: normalizeTickets(initial.tickets),
     });
 
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [showLocation, setShowLocation] = useState(Boolean(initial.latitude || initial.longitude));
     const [linkLater, setLinkLater] = useState(false);
+    const [openTicketWindows, setOpenTicketWindows] = useState<number[]>([]);
+
+    const updateTicket = <K extends keyof TicketFormValues>(index: number, key: K, value: TicketFormValues[K]) => {
+        setData(
+            'tickets',
+            data.tickets.map((ticket, i) => (i === index ? { ...ticket, [key]: value } : ticket))
+        );
+    };
+
+    const addTicket = () => setData('tickets', [...data.tickets, emptyTicket()]);
+
+    const removeTicket = (index: number) => {
+        if (data.tickets.length <= 1) return;
+        setData('tickets', data.tickets.filter((_, i) => i !== index));
+        setOpenTicketWindows((open) => open.filter((i) => i !== index).map((i) => (i > index ? i - 1 : i)));
+    };
+
+    const toggleTicketWindow = (index: number) => {
+        setOpenTicketWindows((open) => (open.includes(index) ? open.filter((i) => i !== index) : [...open, index]));
+    };
+
+    const fieldError = (index: number, key: string): string | undefined =>
+        (errors as unknown as Record<string, string>)[`tickets.${index}.${key}`];
 
     const needsVenue = data.type === 'offline' || data.type === 'hybrid';
     const needsMeetingLink = data.type === 'online' || data.type === 'hybrid';
@@ -171,6 +260,15 @@ export default function EventForm({ initial, existingImageUrl, submitUrl, method
                         error={errors.description}
                         maxLength={5000}
                         rows={5}
+                        required
+                    />
+
+                    <Select
+                        label={t.category_label}
+                        value={data.category}
+                        onChange={(e) => setData('category', e.target.value)}
+                        error={errors.category}
+                        options={categories}
                         required
                     />
 
@@ -360,6 +458,159 @@ export default function EventForm({ initial, existingImageUrl, submitUrl, method
                     />
                 </section>
 
+                {/* Tickets */}
+                <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-5">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wide flex items-center gap-2">
+                                <TicketIcon size={16} className="text-indigo-600" />
+                                {t.tickets_label}
+                            </h2>
+                            <p className="text-xs text-slate-500 mt-1">{t.tickets_hint}</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={addTicket}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-indigo-600 border border-indigo-200 hover:bg-indigo-50 transition-colors shrink-0"
+                        >
+                            <Plus size={16} />
+                            {t.ticket_add}
+                        </button>
+                    </div>
+
+                    <div className="space-y-4">
+                        {data.tickets.map((ticket, index) => {
+                            const windowOpen = openTicketWindows.includes(index);
+                            return (
+                                <div key={index} className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-4">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                                            {t.ticket_number.replace('{n}', String(index + 1))}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => removeTicket(index)}
+                                            disabled={data.tickets.length <= 1}
+                                            className="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            <Trash2 size={14} />
+                                            {t.ticket_remove}
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <Input
+                                            label={t.ticket_name_label}
+                                            placeholder={t.ticket_name_placeholder}
+                                            value={ticket.name}
+                                            onChange={(e) => updateTicket(index, 'name', e.target.value)}
+                                            error={fieldError(index, 'name')}
+                                            maxLength={255}
+                                            required
+                                        />
+                                        <Input
+                                            label={t.ticket_quantity_label}
+                                            placeholder={t.ticket_quantity_placeholder}
+                                            value={ticket.quantity}
+                                            onChange={(e) => updateTicket(index, 'quantity', e.target.value)}
+                                            error={fieldError(index, 'quantity')}
+                                            type="number"
+                                            min={1}
+                                            required
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <Input
+                                            label={t.ticket_price_label}
+                                            placeholder={t.ticket_price_placeholder}
+                                            value={ticket.price}
+                                            onChange={(e) => updateTicket(index, 'price', e.target.value)}
+                                            error={fieldError(index, 'price')}
+                                            type="number"
+                                            min={0}
+                                            step="any"
+                                            hint={t.ticket_free_hint}
+                                            required
+                                        />
+                                        <Input
+                                            label={t.ticket_min_label}
+                                            value={ticket.min_per_order}
+                                            onChange={(e) => updateTicket(index, 'min_per_order', e.target.value)}
+                                            error={fieldError(index, 'min_per_order')}
+                                            type="number"
+                                            min={1}
+                                            required
+                                        />
+                                        <Input
+                                            label={t.ticket_max_label}
+                                            value={ticket.max_per_order}
+                                            onChange={(e) => updateTicket(index, 'max_per_order', e.target.value)}
+                                            error={fieldError(index, 'max_per_order')}
+                                            type="number"
+                                            min={1}
+                                            required
+                                        />
+                                    </div>
+
+                                    <Textarea
+                                        label={t.ticket_description_label}
+                                        placeholder={t.ticket_description_placeholder}
+                                        value={ticket.description}
+                                        onChange={(e) => updateTicket(index, 'description', e.target.value)}
+                                        error={fieldError(index, 'description')}
+                                        maxLength={1000}
+                                        rows={2}
+                                    />
+
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <label className="inline-flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={ticket.is_active}
+                                                onChange={(e) => updateTicket(index, 'is_active', e.target.checked)}
+                                                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500/30"
+                                            />
+                                            <span className="text-sm text-slate-600">{t.ticket_active_label}</span>
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleTicketWindow(index)}
+                                            className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+                                        >
+                                            {t.ticket_window_label}
+                                            <ChevronDown size={14} className={windowOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                                        </button>
+                                    </div>
+
+                                    {windowOpen && (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <Input
+                                                label={t.ticket_sale_starts_label}
+                                                type="datetime-local"
+                                                value={ticket.sale_starts}
+                                                onChange={(e) => updateTicket(index, 'sale_starts', e.target.value)}
+                                                error={fieldError(index, 'sale_starts')}
+                                            />
+                                            <Input
+                                                label={t.ticket_sale_ends_label}
+                                                type="datetime-local"
+                                                value={ticket.sale_ends}
+                                                onChange={(e) => updateTicket(index, 'sale_ends', e.target.value)}
+                                                error={fieldError(index, 'sale_ends')}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {(errors as unknown as Record<string, string>).tickets && (
+                        <p className="text-xs font-medium text-red-500">{t.ticket_error_required}</p>
+                    )}
+                </section>
+
                 {/* Status */}
                 <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
                     <h2 className="text-sm font-semibold text-slate-900 uppercase tracking-wide">{t.status_label}</h2>
@@ -400,6 +651,22 @@ export default function EventForm({ initial, existingImageUrl, submitUrl, method
                     {errors.status && (
                         <p className="text-xs font-medium text-red-500">{errors.status}</p>
                     )}
+                </section>
+
+                {/* WhatsApp ticket delivery */}
+                <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-3">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={data.whatsapp_enabled}
+                            onChange={(e) => setData('whatsapp_enabled', e.target.checked)}
+                            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/30"
+                        />
+                        <span>
+                            <span className="block text-sm font-semibold text-slate-900">{t.whatsapp_label}</span>
+                            <span className="block text-xs text-slate-500 mt-0.5">{t.whatsapp_hint}</span>
+                        </span>
+                    </label>
                 </section>
 
                 {/* Actions */}

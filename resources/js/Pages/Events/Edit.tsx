@@ -3,6 +3,7 @@ import { Head, usePage } from '@inertiajs/react';
 import DashboardLayout from '@/Layouts/DashboardLayout';
 import EventForm from '@/Components/EventForm';
 import { eventTexts, EventLanguage, defaultEventLanguage } from '@/config/event-texts';
+import type { RawTicket } from '@/Components/EventForm';
 import { AlertCircle } from 'lucide-react';
 
 interface EventEditProps {
@@ -10,6 +11,7 @@ interface EventEditProps {
     title: string;
     description: string;
     type: 'online' | 'offline' | 'hybrid';
+    category: string;
     venue_name: string;
     venue_address: string;
     meeting_link: string | null;
@@ -19,11 +21,13 @@ interface EventEditProps {
     end_date: string;
     capacity: number | null;
     status: string;
+    whatsapp_enabled: boolean;
     image_url: string | null;
+    tickets?: RawTicket[];
 }
 
 export default function EditEvent() {
-    const { locale, flash, event } = usePage().props as any;
+    const { locale, flash, event, categories } = usePage().props as any;
     const currentLang = (locale as EventLanguage) || defaultEventLanguage;
     const t = eventTexts[currentLang];
     const eventRow = event as EventEditProps;
@@ -45,6 +49,7 @@ export default function EditEvent() {
                         title: eventRow.title,
                         description: eventRow.description,
                         type: eventRow.type,
+                        category: eventRow.category,
                         venue_name: eventRow.venue_name,
                         venue_address: eventRow.venue_address,
                         meeting_link: eventRow.meeting_link ?? '',
@@ -54,7 +59,10 @@ export default function EditEvent() {
                         end_date: eventRow.end_date,
                         capacity: eventRow.capacity !== null ? String(eventRow.capacity) : '',
                         status: eventRow.status === 'published' ? 'published' : 'draft',
+                        whatsapp_enabled: eventRow.whatsapp_enabled,
+                        tickets: eventRow.tickets ?? [],
                     }}
+                    categories={categories ?? []}
                     existingImageUrl={eventRow.image_url}
                     submitUrl={route('events.update', eventRow.id)}
                     method="patch"

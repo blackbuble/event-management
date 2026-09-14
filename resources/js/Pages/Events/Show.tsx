@@ -13,13 +13,13 @@ import {
     ExternalLink,
     Pencil,
     Share2,
-    User,
     Minus,
     Plus,
     ShoppingCart,
     AlertCircle,
     CheckCircle2,
     Star,
+    Tag,
 } from 'lucide-react';
 
 interface TicketItem {
@@ -75,6 +75,8 @@ interface EventData {
     slug: string;
     description: string | null;
     type: 'online' | 'offline' | 'hybrid';
+    category: string | null;
+    category_label: string | null;
     status: 'draft' | 'published' | 'cancelled';
     image_url: string | null;
     venue_name: string | null;
@@ -89,6 +91,7 @@ interface EventData {
     organizer: Organizer | null;
     attendees: Attendees;
     tickets: TicketItem[];
+    can_book: boolean;
     can_review: boolean;
     my_review: MyReview | null;
 }
@@ -215,6 +218,10 @@ export default function ShowEvent({ event, is_owner }: Props) {
     const hasTickets = event.tickets.length > 0;
     const hasMap = event.latitude !== null && event.longitude !== null;
     const isEventEnded = event.end_date ? new Date(event.end_date) < new Date() : false;
+    // Seamless checkout: guests may buy without an account. Only the event
+    // organizer is blocked (server-enforced too).
+    const isBlockedOwner = isAuthenticated && !event.can_book;
+    const canBook = !isBlockedOwner;
 
     const [quantities, setQuantities] = useState<Record<number, number>>({});
 
@@ -245,9 +252,14 @@ export default function ShowEvent({ event, is_owner }: Props) {
 
         if (tickets.length === 0) return;
 
+        // Head to the transaction page to capture attendee names before checkout.
+        // `indices` keeps the query as tickets[0][ticket_id]=..&tickets[0][quantity]=..
+        // (the default `brackets` format emits tickets[][...] which PHP splits into
+        // separate rows and the server then sees no complete selection).
         setProcessing(true);
-        router.post(`/events/${event.id}/book`, { tickets }, {
+        router.get(route('bookings.create', event.id), { tickets }, {
             preserveScroll: true,
+            queryStringArrayFormat: 'indices',
             onFinish: () => setProcessing(false),
         });
     };
@@ -347,6 +359,12 @@ export default function ShowEvent({ event, is_owner }: Props) {
                                         <TypeIcon className="h-3.5 w-3.5" />
                                         {t[`type_${event.type}` as keyof typeof t]}
                                     </span>
+                                    {event.category_label && (
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
+                                            <Tag className="h-3.5 w-3.5" />
+                                            {event.category_label}
+                                        </span>
+                                    )}
                                     {isDraft && (
                                         <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
                                             {t.draft_badge}
@@ -676,7 +694,7 @@ export default function ShowEvent({ event, is_owner }: Props) {
                                                                 </div>
 
                                                                 {/* Quantity selector */}
-                                                                {!isSoldOut && !isEventEnded && !event.is_full && (
+                                                                {!isSoldOut && !isEventEnded && !event.is_full && canBook && (
                                                                     <div className="flex items-center gap-1">
                                                                         <button
                                                                             type="button"
@@ -735,7 +753,7 @@ export default function ShowEvent({ event, is_owner }: Props) {
                                                         </span>
                                                     </div>
 
-                                                    {isAuthenticated ? (
+                                                    {canBook ? (
                                                         <button
                                                             type="button"
                                                             onClick={handleBook}
@@ -746,21 +764,23 @@ export default function ShowEvent({ event, is_owner }: Props) {
                                                             {processing ? t.booking : t.book_now}
                                                         </button>
                                                     ) : (
-                                                        <Link
-                                                            href="/login"
-                                                            className="w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"
-                                                        >
-                                                            <User className="h-4 w-4" />
-                                                            {t.login_to_book}
-                                                        </Link>
+                                                        <p className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-center text-xs font-medium text-amber-800">
+                                                            {t.organizer_cannot_book}
+                                                        </p>
                                                     )}
                                                 </div>
                                             )}
 
                                             {selectedCount === 0 && !event.is_full && !isEventEnded && (
-                                                <p className="text-xs text-slate-400 text-center">
-                                                    {t.select_tickets}
-                                                </p>
+                                                isBlockedOwner ? (
+                                                    <p className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-center text-xs font-medium text-amber-800">
+                                                        {t.organizer_cannot_book}
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-xs text-slate-400 text-center">
+                                                        {t.select_tickets}
+                                                    </p>
+                                                )
                                             )}
 
                                             {event.is_full && (
@@ -895,24 +915,15 @@ export default function ShowEvent({ event, is_owner }: Props) {
                                     <p className="text-sm text-slate-500">{t.select_tickets}</p>
                                 )}
                             </div>
-                            {selectedCount > 0 ? (
-                                isAuthenticated ? (
-                                    <button
-                                        type="button"
-                                        onClick={handleBook}
-                                        disabled={processing}
-                                        className="rounded-lg bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
-                                    >
-                                        {processing ? t.booking : t.book_now}
-                                    </button>
-                                ) : (
-                                    <Link
-                                        href="/login"
-                                        className="rounded-lg bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 transition-colors"
-                                    >
-                                        {t.login_to_book}
-                                    </Link>
-                                )
+                            {selectedCount > 0 && canBook ? (
+                                <button
+                                    type="button"
+                                    onClick={handleBook}
+                                    disabled={processing}
+                                    className="rounded-lg bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                                >
+                                    {processing ? t.booking : t.book_now}
+                                </button>
                             ) : (
                                 <a
                                     href="#tickets-section"

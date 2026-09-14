@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Enums\EventCategory;
 use App\Models\Event;
 use App\Models\Ticket;
 use App\Repositories\EventRepository;
+use App\Repositories\TicketRepository;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -28,6 +30,7 @@ class EventService
     public function __construct(
         private readonly EventRepository $eventRepository,
         private readonly NotificationService $notificationService,
+        private readonly TicketRepository $ticketRepository,
     ) {}
 
     /**
@@ -90,6 +93,9 @@ class EventService
                 'title' => $event->title,
                 'slug' => $event->slug,
                 'type' => $event->type,
+                'category' => $event->category,
+                'category_label' => EventCategory::tryFrom((string) $event->category)?->label(app()->getLocale())
+                    ?? EventCategory::Other->label(app()->getLocale()),
                 'status' => $event->status,
                 'start_date' => $event->start_date?->toIso8601String(),
                 'end_date' => $event->end_date?->toIso8601String(),
@@ -160,6 +166,9 @@ class EventService
      */
     public function updateEvent(Event $event, array $data): Event
     {
+        $tickets = $data['tickets'] ?? null;
+        unset($data['tickets']);
+
         if (isset($data['image']) && $data['image']) {
             if ($event->image) {
                 Storage::disk('public')->delete($event->image);
@@ -171,7 +180,40 @@ class EventService
             unset($data['image']);
         }
 
-        return $this->eventRepository->update($event, $data);
+        return DB::transaction(function () use ($event, $data, $tickets) {
+            $updated = $this->eventRepository->update($event, $data);
+
+            if (is_array($tickets)) {
+                $this->ticketRepository->syncForEvent($updated, $tickets);
+            }
+
+            return $updated;
+        });
+    }
+
+    /**
+     * Lean ticket payload for the edit form (one query, ordered by price).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function ticketsForEvent(Event $event): array
+    {
+        return $event->tickets()
+            ->orderBy('price')
+            ->get()
+            ->map(fn (Ticket $ticket) => [
+                'id' => $ticket->id,
+                'name' => $ticket->name,
+                'description' => $ticket->description,
+                'price' => (float) $ticket->price,
+                'quantity' => $ticket->quantity,
+                'sale_starts' => $ticket->sale_starts?->format('Y-m-d\TH:i'),
+                'sale_ends' => $ticket->sale_ends?->format('Y-m-d\TH:i'),
+                'min_per_order' => $ticket->min_per_order,
+                'max_per_order' => $ticket->max_per_order,
+                'is_active' => (bool) $ticket->is_active,
+            ])
+            ->all();
     }
 
     /**
@@ -216,54 +258,27 @@ class EventService
     }
 
     /**
-     * Create ticket for event
+     * Create a ticket for an event.
      */
     public function createTicket(Event $event, array $ticketData): Ticket
     {
-        return DB::transaction(function () use ($event, $ticketData) {
-            $ticketData['event_id'] = $event->id;
-
-            return Ticket::create($ticketData);
-        });
+        return $this->ticketRepository->createForEvent($event, $ticketData);
     }
 
     /**
-     * Update ticket
+     * Update a ticket (inventory guard enforced by the repository).
      */
     public function updateTicket(Ticket $ticket, array $data): Ticket
     {
-        return DB::transaction(function () use ($ticket, $data) {
-            // Prevent reducing quantity below sold amount
-            if (isset($data['quantity'])) {
-                $totalUsed = $ticket->quantity_sold + $ticket->quantity_reserved;
-                if ($data['quantity'] < $totalUsed) {
-                    throw new \InvalidArgumentException(
-                        "Cannot reduce quantity below {$totalUsed} (sold: {$ticket->quantity_sold}, reserved: {$ticket->quantity_reserved})"
-                    );
-                }
-            }
-
-            $ticket->update($data);
-
-            return $ticket->fresh();
-        });
+        return $this->ticketRepository->update($ticket, $data);
     }
 
     /**
-     * Delete ticket
+     * Delete a ticket (blocked while active bookings exist).
      */
     public function deleteTicket(Ticket $ticket): bool
     {
-        return DB::transaction(function () use ($ticket) {
-            // Check if ticket has bookings
-            if ($ticket->bookingTickets()->whereHas('booking', function ($q) {
-                $q->where('status', '!=', 'cancelled');
-            })->exists()) {
-                throw new \Exception('Cannot delete ticket with active bookings');
-            }
-
-            return $ticket->delete();
-        });
+        return $this->ticketRepository->delete($ticket);
     }
 
     /**

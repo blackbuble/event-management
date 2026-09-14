@@ -14,12 +14,14 @@ class Event extends Model
     protected $fillable = [
         'user_id', 'title', 'slug', 'description', 'image',
         'venue_name', 'venue_address', 'latitude', 'longitude',
-        'start_date', 'end_date', 'status', 'type', 'meeting_link', 'capacity',
+        'start_date', 'end_date', 'status', 'type', 'category', 'meeting_link', 'capacity',
+        'whatsapp_enabled',
     ];
 
     protected $casts = [
         'start_date' => 'datetime',
         'end_date' => 'datetime',
+        'whatsapp_enabled' => 'boolean',
     ];
 
     protected static function boot()

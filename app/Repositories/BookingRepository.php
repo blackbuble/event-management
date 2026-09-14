@@ -2,6 +2,7 @@
 
 namespace App\Repositories;
 
+use App\Enums\PaymentMethod;
 use App\Models\Booking;
 use App\Models\Event;
 use Illuminate\Database\Eloquent\Builder;
@@ -10,6 +11,35 @@ use Illuminate\Support\Facades\DB;
 
 class BookingRepository
 {
+    /**
+     * Record the chosen payment method and settle the booking.
+     *
+     * Locked + transactional, and returns null when the booking was already
+     * paid under the lock — this makes concurrent double-submits settle once
+     * (no duplicate confirmation / notification).
+     */
+    public function markPaid(Booking $booking, PaymentMethod $method): ?Booking
+    {
+        return DB::transaction(function () use ($booking, $method) {
+            $locked = Booking::query()
+                ->whereKey($booking->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($locked->payment_status === 'paid') {
+                return null;
+            }
+
+            $locked->update([
+                'payment_method' => $method->value,
+                'payment_status' => 'paid',
+                'status' => 'confirmed',
+            ]);
+
+            return $locked->fresh();
+        });
+    }
+
     /**
      * Number of distinct attendees with a confirmed booking on the event.
      */

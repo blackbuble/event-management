@@ -1,122 +1,82 @@
 <?php
+
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Web\StoreTicketRequest;
+use App\Http\Requests\Web\UpdateTicketRequest;
 use App\Models\Event;
 use App\Models\Ticket;
 use App\Services\EventService;
-use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 
 class TicketController extends Controller
 {
-    protected $eventService;
-
-    public function __construct(EventService $eventService)
-    {
-        $this->eventService = $eventService;
-        $this->middleware('auth');
-    }
+    public function __construct(
+        private readonly EventService $eventService,
+    ) {}
 
     /**
-     * Show create ticket form
+     * Add a ticket type to an event.
      */
-    public function create(Event $event)
-    {    $this->authorize('update', $event);
-
-    return view('tickets.create', compact('event'));}
-
-    /**
-     * Store new ticket
-     */
-    public function store(Request $request, Event $event)
-    {<?php
-
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration
-{
-    public function up(): void
+    public function store(StoreTicketRequest $request, Event $event): RedirectResponse
     {
-        Schema::table('tickets', function (Blueprint $table) {
-            $table->unique(['event_id', 'name'], 'tickets_event_id_name_unique');
-        });
-    }
+        try {
+            $data = $request->validated();
+            $data['is_active'] ??= true;
 
-    public function down(): void
-    {
-        Schema::table('tickets', function (Blueprint $table) {
-            $table->dropUnique('tickets_event_id_name_unique');
-        });
-    }
-};}
-
-    /**
-     * Show edit ticket form
-     */
-    public function edit(Event $event, Ticket $ticket)
-    {
-        $this->authorize('update', $event);
-
-        if ($ticket->event_id !== $event->id) {
-            abort(404);
+            $this->eventService->createTicket($event, $data);
+        } catch (\InvalidArgumentException $exception) {
+            return back()->withInput()->with('error', $exception->getMessage());
         }
 
-        return view('tickets.edit', compact('event', 'ticket'));
+        return redirect()->route('events.edit', $event)->with('message', $this->text('created'));
     }
 
     /**
-     * Update ticket
+     * Update an existing ticket type.
      */
-    public function update(Request $request, Event $event, Ticket $ticket)
+    public function update(UpdateTicketRequest $request, Event $event, Ticket $ticket): RedirectResponse
     {
-        $this->authorize('update', $event);
-
-        if ($ticket->event_id !== $event->id) {
-            abort(404);
-        }
-
-        $validated = $request->validate([
-            'name' => 'required|max:255',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric|min:0',
-            'quantity' => 'required|integer|min:1',
-            'sale_starts' => 'nullable|date',
-            'sale_ends' => 'nullable|date|after:sale_starts',
-            'min_per_order' => 'required|integer|min:1',
-            'max_per_order' => 'required|integer|min:1|gte:min_per_order',
-            'is_active' => 'boolean',
-        ]);
+        $this->ensureTicketBelongsToEvent($ticket, $event);
 
         try {
-            $this->eventService->updateTicket($ticket, $validated);
-
-            return redirect()->route('events.edit', $event)
-                ->with('success', 'Ticket updated successfully!');
-        } catch (\Exception $e) {
-            return back()->withInput()
-                ->withErrors(['error' => $e->getMessage()]);
+            $this->eventService->updateTicket($ticket, $request->validated());
+        } catch (\InvalidArgumentException $exception) {
+            return back()->withInput()->with('error', $exception->getMessage());
         }
+
+        return redirect()->route('events.edit', $event)->with('message', $this->text('updated'));
     }
 
     /**
-     * Delete ticket
+     * Remove a ticket type (blocked while active bookings exist).
      */
-    public function destroy(Event $event, Ticket $ticket)
+    public function destroy(Event $event, Ticket $ticket): RedirectResponse
     {
-        $this->authorize('update', $event);
-
-        if ($ticket->event_id !== $event->id) {
-            abort(404);
-        }
+        $this->ensureTicketBelongsToEvent($ticket, $event);
 
         try {
             $this->eventService->deleteTicket($ticket);
-
-            return redirect()->route('events.edit', $event)
-                ->with('success', 'Ticket deleted successfully!');
-        } catch (\Exception $e) {
-            return back()->withErrors(['error' => $e->getMessage()]);
+        } catch (\InvalidArgumentException $exception) {
+            return redirect()->route('events.edit', $event)->with('error', $exception->getMessage());
         }
+
+        return redirect()->route('events.edit', $event)->with('message', $this->text('deleted'));
+    }
+
+    private function ensureTicketBelongsToEvent(Ticket $ticket, Event $event): void
+    {
+        abort_unless($ticket->event_id === $event->id, 404);
+    }
+
+    private function text(string $action): string
+    {
+        $isId = app()->getLocale() === 'id';
+
+        return match ($action) {
+            'created' => $isId ? 'Tiket berhasil ditambahkan.' : 'Ticket created successfully.',
+            'updated' => $isId ? 'Tiket berhasil diperbarui.' : 'Ticket updated successfully.',
+            default => $isId ? 'Tiket berhasil dihapus.' : 'Ticket deleted successfully.',
+        };
     }
 }

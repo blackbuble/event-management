@@ -4,6 +4,7 @@ export const dashboardTexts = {
             title: 'Dashboard',
             subtitle: 'Selamat datang kembali, {name}.',
             create_event: 'Buat Event',
+            whatsapp: 'Kuota WhatsApp',
         },
         organizer: {
             active_events: 'Event Aktif',
@@ -41,6 +42,7 @@ export const dashboardTexts = {
             title: 'Dashboard',
             subtitle: 'Welcome back, {name}.',
             create_event: 'Create Event',
+            whatsapp: 'WhatsApp Quota',
         },
         organizer: {
             active_events: 'Active Events',

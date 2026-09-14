@@ -4,7 +4,6 @@ namespace App\Policies;
 
 use App\Models\Booking;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class BookingPolicy
 {
@@ -43,6 +42,16 @@ class BookingPolicy
     {
         // All authenticated users can create bookings
         return true;
+    }
+
+    /**
+     * Determine whether the user can pay for the booking.
+     * Strictly the booking owner — organizers/admins paying on behalf
+     * of someone else is out of scope.
+     */
+    public function pay(User $user, Booking $booking): bool
+    {
+        return $user->id === $booking->user_id;
     }
 
     /**

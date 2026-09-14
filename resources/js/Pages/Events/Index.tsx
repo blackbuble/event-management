@@ -17,6 +17,7 @@ import {
     AlertCircle,
     Eye,
     Pencil,
+    BarChart3,
     Rocket,
     XCircle,
     Trash2,
@@ -27,6 +28,7 @@ interface EventRow {
     title: string;
     slug: string;
     type: 'online' | 'offline' | 'hybrid';
+    category_label: string | null;
     status: 'draft' | 'published' | 'cancelled';
     start_date: string | null;
     end_date: string | null;
@@ -74,7 +76,7 @@ export default function EventIndex() {
         meeting_link: string;
     }>({ meeting_link: '' });
 
-    const { post: postSend, processing: sending } = useForm();
+    const { post: postSend, processing: sending } = useForm({});
 
     const openLinkEditor = (eventRow: EventRow) => {
         setLinkEditingId(eventRow.id);
@@ -162,6 +164,11 @@ export default function EventIndex() {
                                                     <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
                                                         {(t as Record<string, string>)[`type_${eventRow.type}`]}
                                                     </span>
+                                                    {eventRow.category_label && (
+                                                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600">
+                                                            {eventRow.category_label}
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-1.5">
                                                     <Calendar size={13} />
@@ -220,6 +227,13 @@ export default function EventIndex() {
                                     >
                                         <Pencil size={15} />
                                         {t.edit}
+                                    </Link>
+                                    <Link
+                                        href={route('events.analytics', eventRow.id)}
+                                        className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                                    >
+                                        <BarChart3 size={15} />
+                                        {t.stats}
                                     </Link>
                                     {eventRow.status === 'draft' && (
                                         <Link

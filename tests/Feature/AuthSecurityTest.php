@@ -4,9 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class AuthSecurityTest extends TestCase
@@ -18,11 +20,11 @@ class AuthSecurityTest extends TestCase
      */
     public function test_otp_is_invalidated_after_five_failed_attempts()
     {
-        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
+        $this->withoutMiddleware(ThrottleRequests::class);
 
         // Speed up bcrypt for testing
         config(['auth.providers.users.model' => User::class]);
-        
+
         $phone = '+628123456789';
         $user = User::factory()->create(['phone' => $phone]);
 
@@ -37,24 +39,24 @@ class AuthSecurityTest extends TestCase
                 ->post('/otp/login', [
                     'otp' => '000000',
                 ]);
-            
+
             $response->assertStatus(302);
             $response->assertSessionHasErrors('otp');
         }
 
         // The 6th attempt should fail because the OTP field was nulled
         $user->refresh();
-        $this->assertNull($user->otp, "OTP field should be null after 5 failed attempts");
-        
+        $this->assertNull($user->otp, 'OTP field should be null after 5 failed attempts');
+
         // Attempt with correct OTP should now fail because it's already nulled
         $response = $this->withSession(['auth_identity' => $phone])
             ->from('/otp/login') // Ensure referral is set so back() works correctly
             ->post('/otp/login', ['otp' => '123456']);
-            
+
         $response->assertStatus(302);
         // Check for any errors if 'otp' is missing
-        if (!$response->getSession()->has('errors')) {
-            $this->fail("Session has no errors. Status: " . $response->status());
+        if (! $response->getSession()->has('errors')) {
+            $this->fail('Session has no errors. Status: '.$response->status());
         }
         $response->assertSessionHasErrors('otp');
     }
@@ -66,7 +68,7 @@ class AuthSecurityTest extends TestCase
     {
         $victimPhone = '+628111111111';
         $attackerPhone = '+628999999999';
-        
+
         $victim = User::factory()->create(['phone' => $victimPhone]);
         $attacker = User::factory()->create(['phone' => $attackerPhone]);
 
@@ -85,7 +87,7 @@ class AuthSecurityTest extends TestCase
                 'otp' => '111111',
             ]);
 
-        $this->assertFalse(\Illuminate\Support\Facades\Auth::check(), "Attacker should not be logged in");
+        $this->assertFalse(Auth::check(), 'Attacker should not be logged in');
         $response->assertSessionHasErrors('otp');
     }
 
@@ -94,17 +96,17 @@ class AuthSecurityTest extends TestCase
      */
     public function test_rate_limiting_is_applied_per_identity()
     {
-        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
+        $this->withoutMiddleware(ThrottleRequests::class);
 
         $identity = 'spam-target@example.com';
-        RateLimiter::clear('auth_gate_' . \Illuminate\Support\Str::slug($identity));
-        
+        RateLimiter::clear('auth_gate_'.Str::slug($identity));
+
         for ($i = 0; $i < 5; $i++) {
             $this->post('/login', ['identity' => $identity]);
         }
 
         $response = $this->post('/login', ['identity' => $identity]);
-        
+
         $response->assertStatus(302);
         $response->assertSessionHasErrors('identity');
     }

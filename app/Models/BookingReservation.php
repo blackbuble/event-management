@@ -1,8 +1,10 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class BookingReservation extends Model
 {
@@ -23,12 +25,18 @@ class BookingReservation extends Model
     ];
 
     // Relationships
-    public function user()
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function event()
+    /**
+     * @return BelongsTo<Event, $this>
+     */
+    public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
     }
@@ -54,7 +62,7 @@ class BookingReservation extends Model
 
     public function isActive()
     {
-        return $this->status === 'active' && !$this->isExpired();
+        return $this->status === 'active' && ! $this->isExpired();
     }
 
     public function calculateTotal()
@@ -63,6 +71,7 @@ class BookingReservation extends Model
         foreach ($this->ticket_data as $item) {
             $total += $item['price'] * $item['quantity'];
         }
+
         return $total;
     }
 }

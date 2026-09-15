@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Services\AuthService;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Laravel\Socialite\Facades\Socialite;
 
 class AuthController extends Controller
 {
@@ -35,16 +38,17 @@ class AuthController extends Controller
         $request->validate([
             'identity' => 'required|string',
         ]);
-        
+
         $identity = $request->identity;
         $isEmail = filter_var($identity, FILTER_VALIDATE_EMAIL);
 
         // EXTRA SECURITY: Identity-based rate limiting (per phone/email)
-        $throttleKey = 'auth_gate_' . Str::slug($identity);
+        $throttleKey = 'auth_gate_'.Str::slug($identity);
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
+
             return back()->withErrors([
-                'identity' => "Terlalu banyak percobaan. Silakan coba lagi dalam {$seconds} detik."
+                'identity' => "Terlalu banyak percobaan. Silakan coba lagi dalam {$seconds} detik.",
             ]);
         }
         RateLimiter::hit($throttleKey, 60);
@@ -54,13 +58,15 @@ class AuthController extends Controller
 
         if ($isEmail) {
             $this->authService->generateMagicLink($user->email);
+
             return back()->with('message', 'Tautan login telah dikirim ke email Anda.');
         } else {
             // Store identity in session for security
             $request->session()->put('auth_identity', $identity);
-            
+
             // For phone, generate OTP
             $this->authService->generateOtp($user->email ?? $user->phone);
+
             return redirect()->route('otp.login')->with('message', 'Kode verifikasi telah dikirim ke WhatsApp Anda.');
         }
     }
@@ -72,12 +78,12 @@ class AuthController extends Controller
     {
         $identity = $request->session()->get('auth_identity');
 
-        if (!$identity) {
+        if (! $identity) {
             return redirect()->route('login')->withErrors(['identity' => 'Sesi verifikasi telah berakhir. Silakan masuk kembali.']);
         }
 
         return Inertia::render('Auth/VerifyOtp', [
-            'identity' => $identity
+            'identity' => $identity,
         ]);
     }
 
@@ -88,7 +94,7 @@ class AuthController extends Controller
     {
         $identity = $request->session()->get('auth_identity');
 
-        if (!$identity) {
+        if (! $identity) {
             return redirect()->route('login')->withErrors(['identity' => 'Sesi verifikasi telah berakhir. Silakan masuk kembali.']);
         }
 
@@ -98,13 +104,13 @@ class AuthController extends Controller
 
         try {
             $result = $this->authService->loginWithOtp($identity, $request->otp);
-            
+
             Auth::login($result['user']);
             $request->session()->forget('auth_identity');
             $request->session()->regenerate();
 
             return redirect()->intended('/dashboard');
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             throw $e;
         } catch (\Exception $e) {
             return back()->withErrors(['otp' => $e->getMessage()]);
@@ -120,7 +126,7 @@ class AuthController extends Controller
 
         try {
             $result = $this->authService->validateMagicLink($request->token);
-            
+
             Auth::login($result['user']);
             $request->session()->regenerate();
 
@@ -135,14 +141,14 @@ class AuthController extends Controller
      */
     public function redirectToProvider($provider)
     {
-        return \Laravel\Socialite\Facades\Socialite::driver($provider)->redirect();
+        return Socialite::driver($provider)->redirect();
     }
 
     public function handleProviderCallback($provider)
     {
         try {
-            $socialUser = \Laravel\Socialite\Facades\Socialite::driver($provider)->user();
-            
+            $socialUser = Socialite::driver($provider)->user();
+
             $result = $this->authService->socialLogin([
                 'name' => $socialUser->getName(),
                 'email' => $socialUser->getEmail(),
@@ -157,7 +163,8 @@ class AuthController extends Controller
             return redirect()->intended('/dashboard');
 
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("Social Login Error ({$provider}): " . $e->getMessage());
+            Log::error("Social Login Error ({$provider}): ".$e->getMessage());
+
             return redirect()->route('login')->withErrors([
                 'email' => "Gagal masuk menggunakan {$provider}. Silakan coba lagi.",
             ]);
@@ -172,6 +179,7 @@ class AuthController extends Controller
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
         return redirect('/');
     }
 }

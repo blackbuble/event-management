@@ -1,4 +1,5 @@
 <?php
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -22,7 +23,7 @@ return new class extends Migration
             $table->integer('max_per_order')->default(10);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
-            
+
             $table->index(['event_id', 'is_active']);
         });
     }

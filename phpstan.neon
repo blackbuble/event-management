@@ -1,0 +1,13 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app
+    level: 5
+    treatPhpDocTypesAsCertain: false
+    ignoreErrors:
+        # Eloquent magic (scopes, attributes, select aliases) is resolved by
+        # Larastan; leave the dynamic model surface to runtime + feature tests
+        # rather than annotating every model property.
+        - '#Access to an undefined property (Illuminate\\Database\\Eloquent\\Model|App\\Models\\.*)#'

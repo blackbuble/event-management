@@ -10,6 +10,8 @@ interface AuthLayoutProps {
 }
 
 const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitle }) => {
+    const { locale } = usePage().props as any;
+
     return (
         <div className="min-h-screen relative flex flex-col items-center justify-center p-6 md:p-8 overflow-hidden selection:bg-indigo-500 selection:text-white">
             {/* Background Image with Eventbrite-style premium overlay */}
@@ -35,7 +37,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitle }) =>
                         <a
                             key={lang}
                             href={route('language.switch', lang)}
-                            className={`px-3 py-1.5 rounded-lg flex items-center text-[10px] font-black uppercase tracking-widest transition-all ${(usePage().props as any).locale === lang
+                            className={`px-3 py-1.5 rounded-lg flex items-center text-[10px] font-black uppercase tracking-widest transition-all ${locale === lang
                                 ? 'bg-white text-indigo-600 shadow-sm'
                                 : 'text-white/60 hover:text-white'
                                 }`}

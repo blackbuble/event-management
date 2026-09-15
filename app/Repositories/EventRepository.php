@@ -46,7 +46,7 @@ class EventRepository
             ->where('user_id', $organizerId)
             ->with('categoryModel')
             ->withCount([
-                'bookings' => fn (Builder $query) => $query->confirmed(),
+                'bookings' => fn (Builder $query) => $query->where('status', 'confirmed'),
             ])
             ->latest('start_date')
             ->paginate($perPage);
@@ -60,7 +60,7 @@ class EventRepository
         return User::query()
             ->whereHas('bookings', fn (Builder $query) => $query
                 ->where('event_id', $eventId)
-                ->confirmed())
+                ->where('status', 'confirmed'))
             ->get(['id', 'name', 'email', 'phone']);
     }
 

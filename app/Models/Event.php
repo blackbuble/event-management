@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
@@ -42,32 +44,42 @@ class Event extends Model
     }
 
     // Relationships
-    public function user()
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function categoryModel()
+    /**
+     * @return BelongsTo<Category, $this>
+     */
+    public function categoryModel(): BelongsTo
     {
         return $this->belongsTo(Category::class, 'category', 'slug');
     }
 
-    public function tickets()
+    /**
+     * @return HasMany<Ticket, $this>
+     */
+    public function tickets(): HasMany
     {
         return $this->hasMany(Ticket::class);
     }
 
-    public function bookings()
+    /**
+     * @return HasMany<Booking, $this>
+     */
+    public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class);
     }
 
-    public function reservations()
-    {
-        return $this->hasMany(BookingReservation::class);
-    }
-
-    public function reviews()
+    /**
+     * @return HasMany<EventReview, $this>
+     */
+    public function reviews(): HasMany
     {
         return $this->hasMany(EventReview::class);
     }

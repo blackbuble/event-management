@@ -54,9 +54,10 @@ class EventAnalyticsRepository
     }
 
     /**
-     * Paid revenue + paid quantity grouped by ticket type.
+     * Paid revenue + paid quantity grouped by ticket type (raw `revenue` /
+     * `paid_quantity` select aliases on the returned rows).
      *
-     * @return Collection<int|string, object{revenue: float, paid_quantity: int}>
+     * @return \Illuminate\Database\Eloquent\Collection<int|string, BookingTicket>
      */
     public function paidRevenueByTicket(int $eventId): Collection
     {
@@ -87,9 +88,10 @@ class EventAnalyticsRepository
     }
 
     /**
-     * Paid bookings per day since the given date (inclusive), for the trend chart.
+     * Paid bookings per day since the given date (inclusive), for the trend chart
+     * (raw `date` / `bookings` / `revenue` select aliases).
      *
-     * @return Collection<int, object{date: string, bookings: int, revenue: float}>
+     * @return \Illuminate\Database\Eloquent\Collection<int, Booking>
      */
     public function paidTimeline(int $eventId, int $days = 14): Collection
     {

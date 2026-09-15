@@ -161,6 +161,20 @@ php artisan db:seed --class=RoleSeeder
 
 ---
 
+## 🧭 Architecture Decisions (ADR)
+
+- [ADR index](./adr/README.md) — settings store, admin auth + impersonation, i18n registry, WhatsApp quota, QR dependency, visitor analytics, platform fee, runtime/service boundaries.
+
+## 🛠️ Runbooks
+
+- [Runbooks index](./runbooks/README.md) — deploy, rollback, incident response, backup/restore, performance baseline.
+
+## ✅ Quality Gates (CI)
+
+`.github/workflows/ci.yml` runs: `pint --test`, `phpstan analyse` (Larastan level 5), `php artisan test`, `npm run typecheck`, `npm run lint` (ESLint), `npm run test:js` (Vitest), `npm run build`.
+
+---
+
 ## 🏗️ Architecture
 
 ### Service-Repository Pattern

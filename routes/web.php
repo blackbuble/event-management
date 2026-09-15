@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\Web\Admin\AdminAuthController;
 use App\Http\Controllers\Web\Admin\AnalyticsController as AdminAnalyticsController;
@@ -20,6 +21,10 @@ use App\Http\Controllers\Web\ReviewController;
 use App\Http\Controllers\Web\WhatsAppController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+
+// Liveness / readiness probes (public, no auth)
+Route::get('/health/live', [HealthController::class, 'live'])->name('health.live');
+Route::get('/health/ready', [HealthController::class, 'ready'])->name('health.ready');
 
 Route::get('/language/{locale}', function ($locale) {
     if (in_array($locale, ['id', 'en'])) {

@@ -49,8 +49,9 @@ class AdminAnalyticsService
 
     /**
      * Ordered bucket map: key => human label for the selected year.
+     * Numeric year keys are cast to int by PHP, so the key type is mixed.
      *
-     * @return array<string, string>
+     * @return array<int|string, string>
      */
     private function buckets(string $period, int $year): array
     {
@@ -120,7 +121,7 @@ class AdminAnalyticsService
         return range((int) now()->year, $from);
     }
 
-    private function bucketKey(Carbon $date, string $period): string
+    private function bucketKey(\Carbon\Carbon $date, string $period): string
     {
         return match ($period) {
             'week' => $date->format('o-\WW'),
@@ -141,6 +142,10 @@ class AdminAnalyticsService
             ->whereBetween('created_at', [$start, $end])
             ->get(['id', 'created_at'])
             ->each(function (Event $event) use (&$series, $period) {
+                if ($event->created_at === null) {
+                    return;
+                }
+
                 $key = $this->bucketKey($event->created_at, $period);
                 if (isset($series[$key])) {
                     $series[$key]++;
@@ -165,6 +170,10 @@ class AdminAnalyticsService
             ->whereBetween('created_at', [$start, $end])
             ->get(['created_at', 'total_amount', 'platform_fee'])
             ->each(function (Booking $booking) use (&$series, $period, $channel) {
+                if ($booking->created_at === null) {
+                    return;
+                }
+
                 $key = $this->bucketKey($booking->created_at, $period);
                 if (! isset($series[$key])) {
                     return;
@@ -275,8 +284,8 @@ class AdminAnalyticsService
 
             return [
                 'id' => $row->event_id,
-                'title' => $event?->title ?? '—',
-                'city' => $event?->city,
+                'title' => $event instanceof Event ? $event->title : '—',
+                'city' => $event instanceof Event ? $event->city : null,
                 'bookings' => (int) $row->bookings,
                 'revenue' => round((float) $row->revenue, 2),
             ];

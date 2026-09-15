@@ -19,12 +19,12 @@ return new class extends Migration
         // DB::table('users')->get()->each(function ($user) {
         //     DB::table('users')->where('id', $user->id)->update(['uuid' => Str::uuid()]);
         // });
-        
-        // After populating, one would typically make it not nullable. 
-        // For this migration, we'll leave it nullable or assume fresh DB. 
+
+        // After populating, one would typically make it not nullable.
+        // For this migration, we'll leave it nullable or assume fresh DB.
         // If fresh DB, we can make it not nullable default.
         // But to be safe with existing data:
-        // $table->uuid('uuid')->after('id')->unique()->nullable(false)->change(); 
+        // $table->uuid('uuid')->after('id')->unique()->nullable(false)->change();
     }
 
     public function down(): void

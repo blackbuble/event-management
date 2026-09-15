@@ -57,7 +57,7 @@ export default function Welcome() {
 
     // Calculate distance for nearby sorting (Euclidean distance simplified)
     const filteredEvents = useMemo(() => {
-        let events = MOCK_EVENTS.filter(event => {
+        const events = MOCK_EVENTS.filter(event => {
             const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 event.location.toLowerCase().includes(searchTerm.toLowerCase());
             const matchesCategory = selectedCategory === 'all' || event.category === selectedCategory;

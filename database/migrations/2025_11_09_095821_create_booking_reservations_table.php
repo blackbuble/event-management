@@ -1,4 +1,5 @@
 <?php
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -16,7 +17,7 @@ return new class extends Migration
             $table->timestamp('expires_at');
             $table->enum('status', ['active', 'completed', 'expired', 'cancelled'])->default('active');
             $table->timestamps();
-            
+
             $table->index(['expires_at', 'status']);
             $table->index('reservation_token');
         });

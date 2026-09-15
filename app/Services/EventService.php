@@ -87,7 +87,7 @@ class EventService
         $paginator = $this->eventRepository->listForOrganizer($organizerId, $perPage);
 
         return [
-            'events' => $paginator->getCollection()->map(fn (Event $event) => [
+            'events' => collect($paginator->items())->map(fn (Event $event) => [
                 'id' => $event->id,
                 'title' => $event->title,
                 'slug' => $event->slug,

@@ -3,11 +3,10 @@
 namespace Tests\Unit;
 
 use App\Models\User;
-use App\Services\AuthService;
 use App\Repositories\UserRepository;
+use App\Services\AuthService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class AuthServiceSecurityTest extends TestCase
@@ -19,7 +18,7 @@ class AuthServiceSecurityTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->authService = new AuthService(new UserRepository(new User()));
+        $this->authService = new AuthService(new UserRepository(new User));
     }
 
     /**
@@ -66,7 +65,7 @@ class AuthServiceSecurityTest extends TestCase
         User::factory()->create([
             'email' => $email,
             'social_id' => 'original_id',
-            'social_type' => 'google'
+            'social_type' => 'google',
         ]);
 
         $this->expectException(\Exception::class);
@@ -76,7 +75,7 @@ class AuthServiceSecurityTest extends TestCase
             'name' => 'Hacker',
             'email' => $email,
             'social_id' => 'attacker_id', // Different ID
-            'social_type' => 'google'
+            'social_type' => 'google',
         ]);
     }
 
@@ -88,7 +87,7 @@ class AuthServiceSecurityTest extends TestCase
         $user = User::factory()->create([
             'email' => 'test@example.com',
             'otp' => Hash::make('123456'),
-            'otp_expires_at' => now()->addMinutes(10)
+            'otp_expires_at' => now()->addMinutes(10),
         ]);
 
         $this->authService->loginWithOtp('test@example.com', '123456');

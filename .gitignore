@@ -16,6 +16,8 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+/.vcto
+/.gstack
 
 # OS
 .DS_Store
@@ -28,6 +30,9 @@ Thumbs.db
 .project
 .settings
 .buildpath
+AGENTS.md
+.vcto_full_analysis.md
+AGENTS#1.md
 
 # Composer
 composer.phar

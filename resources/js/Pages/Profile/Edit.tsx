@@ -5,7 +5,9 @@ import { User, Mail, Phone, Save, Camera, CheckCircle2 } from 'lucide-react';
 import { Input, Button } from '@/Components/Form'; // Assuming we have these, or I'll use standard HTML
 
 export default function Edit({ mustVerifyEmail, status }: { mustVerifyEmail?: boolean, status?: string }) {
-    const user = usePage().props.auth.user;
+    const page = usePage();
+    const user = (page.props as any).auth.user;
+    const flash = (page.props as any).flash;
 
     const { data, setData, patch, errors, processing, recentlySuccessful } = useForm({
         name: user.name,
@@ -32,7 +34,7 @@ export default function Edit({ mustVerifyEmail, status }: { mustVerifyEmail?: bo
                 </div>
 
                 {/* Flash Messages */}
-                {usePage().props.flash?.warning && (
+                {flash?.warning && (
                     <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg">
                         <div className="flex">
                             <div className="flex-shrink-0">
@@ -42,14 +44,14 @@ export default function Edit({ mustVerifyEmail, status }: { mustVerifyEmail?: bo
                             </div>
                             <div className="ml-3">
                                 <p className="text-sm text-amber-700">
-                                    {usePage().props.flash.warning}
+                                    {flash?.warning}
                                 </p>
                             </div>
                         </div>
                     </div>
                 )}
 
-                {usePage().props.flash?.message && (
+                {flash?.message && (
                     <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded-r-lg">
                         <div className="flex">
                             <div className="flex-shrink-0">
@@ -57,7 +59,7 @@ export default function Edit({ mustVerifyEmail, status }: { mustVerifyEmail?: bo
                             </div>
                             <div className="ml-3">
                                 <p className="text-sm text-emerald-700">
-                                    {usePage().props.flash.message}
+                                    {flash?.message}
                                 </p>
                             </div>
                         </div>
@@ -92,7 +94,7 @@ export default function Edit({ mustVerifyEmail, status }: { mustVerifyEmail?: bo
                                         <input
                                             id="name"
                                             type="text"
-                                            autoFocus={!!usePage().props.flash?.warning || data.name.startsWith("User ")}
+                                            autoFocus={!!flash?.warning || data.name.startsWith("User ")}
                                             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-medium text-slate-900"
                                             value={data.name}
                                             onChange={(e) => setData('name', e.target.value)}

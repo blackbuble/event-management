@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
 class BookingTicket extends Model
@@ -34,12 +35,18 @@ class BookingTicket extends Model
     }
 
     // Relationships
-    public function booking()
+    /**
+     * @return BelongsTo<Booking, $this>
+     */
+    public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
     }
 
-    public function ticket()
+    /**
+     * @return BelongsTo<Ticket, $this>
+     */
+    public function ticket(): BelongsTo
     {
         return $this->belongsTo(Ticket::class);
     }

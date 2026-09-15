@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\HasUuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -46,18 +47,19 @@ class User extends Authenticatable
         return $this->suspended_at !== null;
     }
 
-    public function events()
+    /**
+     * @return HasMany<Event, $this>
+     */
+    public function events(): HasMany
     {
         return $this->hasMany(Event::class);
     }
 
-    public function bookings()
+    /**
+     * @return HasMany<Booking, $this>
+     */
+    public function bookings(): HasMany
     {
         return $this->hasMany(Booking::class);
-    }
-
-    public function reservations()
-    {
-        return $this->hasMany(BookingReservation::class);
     }
 }

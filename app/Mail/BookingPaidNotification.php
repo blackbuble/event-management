@@ -45,8 +45,8 @@ class BookingPaidNotification extends Mailable implements ShouldQueue
             markdown: 'emails.bookings.paid',
             with: [
                 'locale' => $this->mailLocale,
-                'recipientName' => $this->booking->user?->name ?? 'Attendee',
-                'eventName' => $this->booking->event?->title ?? 'Event',
+                'recipientName' => $this->booking->user->name ?? 'Attendee',
+                'eventName' => $this->booking->event->title ?? 'Event',
                 'bookingNumber' => $this->booking->booking_number,
                 'totalAmount' => number_format((float) $this->booking->total_amount, 0, ',', '.'),
                 'paymentMethod' => $this->booking->payment_method,

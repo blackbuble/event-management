@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, ArrowRight, User, Phone, CheckCircle2, Mail } from 'lucide-react';
 
 export default function Welcome() {
-    const user = usePage().props.auth.user;
+    const user = (usePage().props as any).auth.user;
     const [step, setStep] = useState(1);
 
     const { data, setData, patch, processing, errors } = useForm({

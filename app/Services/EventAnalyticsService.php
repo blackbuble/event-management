@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\Booking;
+use App\Models\BookingTicket;
 use App\Models\Event;
 use App\Models\Ticket;
 use App\Repositories\EventAnalyticsRepository;
@@ -66,7 +68,7 @@ class EventAnalyticsService
     }
 
     /**
-     * @param  Collection<int|string, object{revenue: float, paid_quantity: int}>  $revenueByTicket
+     * @param  Collection<int|string, BookingTicket>  $revenueByTicket
      * @return array<int, array<string, mixed>>
      */
     private function mapTickets(Event $event, Collection $revenueByTicket): array
@@ -99,7 +101,7 @@ class EventAnalyticsService
     /**
      * Fill every day in the window (zeros included) so the chart has no gaps.
      *
-     * @param  Collection<int, object{date: string, bookings: int, revenue: float}>  $timeline
+     * @param  Collection<int, Booking>  $timeline
      * @return array<int, array{date: string, bookings: int, revenue: float}>
      */
     private function mapTimeline(Collection $timeline, int $days): array

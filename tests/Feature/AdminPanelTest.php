@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\City;
+use App\Models\Setting;
 use App\Models\User;
 use App\Models\WhatsAppPackage;
 use App\Services\SettingsService;
@@ -107,6 +108,21 @@ class AdminPanelTest extends TestCase
         ])->assertRedirect();
 
         $this->assertSame('sk_test_456', $settings->get('payment_gateway.secret_key'));
+    }
+
+    public function test_payment_secret_is_encrypted_at_rest(): void
+    {
+        $this->actingAs($this->admin())->put(route('admin.settings.payment'), [
+            'enabled' => true,
+            'provider' => 'midtrans',
+            'api_key' => 'pk_test_123',
+            'secret_key' => 'super-secret-value',
+        ])->assertRedirect();
+
+        $raw = Setting::where('key', 'payment_gateway.secret_key')->value('value');
+
+        $this->assertStringNotContainsString('super-secret-value', (string) $raw);
+        $this->assertSame('super-secret-value', app(SettingsService::class)->get('payment_gateway.secret_key'));
     }
 
     public function test_admin_can_update_platform_fee(): void

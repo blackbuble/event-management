@@ -43,8 +43,8 @@ class BookingReceivedNotification extends Mailable implements ShouldQueue
             markdown: 'emails.bookings.received',
             with: [
                 'locale' => $this->mailLocale,
-                'recipientName' => $this->booking->user?->name ?? 'Attendee',
-                'eventName' => $this->booking->event?->title ?? 'Event',
+                'recipientName' => $this->booking->user->name ?? 'Attendee',
+                'eventName' => $this->booking->event->title ?? 'Event',
                 'bookingNumber' => $this->booking->booking_number,
                 'totalAmount' => number_format((float) $this->booking->total_amount, 0, ',', '.'),
                 'paymentStatus' => $this->booking->payment_status,

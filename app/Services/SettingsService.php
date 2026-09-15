@@ -68,7 +68,7 @@ class SettingsService
     }
 
     /**
-     * @return array{enabled: bool, provider: string, token: string, sender: string}
+     * @return array{enabled: bool, provider: string, token: bool, sender: string}
      */
     public function whatsappProvider(): array
     {

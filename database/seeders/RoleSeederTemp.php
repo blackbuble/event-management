@@ -7,10 +7,10 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Temporary Role Seeder (Manual SQL)
- * 
+ *
  * This seeder creates roles directly using SQL without requiring Spatie package.
  * Use this ONLY if Spatie package is not installed yet.
- * 
+ *
  * After installing Spatie, use the original RoleSeeder.php instead.
  */
 class RoleSeederTemp extends Seeder
@@ -31,14 +31,14 @@ class RoleSeederTemp extends Seeder
                 ->where('guard_name', $role['guard_name'])
                 ->exists();
 
-            if (!$exists) {
+            if (! $exists) {
                 DB::table('roles')->insert([
                     'name' => $role['name'],
                     'guard_name' => $role['guard_name'],
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
-                
+
                 $this->command->info("✓ Role '{$role['name']}' created");
             } else {
                 $this->command->warn("⚠ Role '{$role['name']}' already exists");

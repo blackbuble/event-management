@@ -18,7 +18,7 @@ return new class extends Migration
         $pivotPermission = $columnNames['permission_pivot_key'] ?? 'permission_id';
 
         if (empty($tableNames)) {
-            throw new \Exception('Error: config/permission.php not loaded. Run [php artisan config:clear] and try again.');
+            throw new Exception('Error: config/permission.php not loaded. Run [php artisan config:clear] and try again.');
         }
 
         Schema::create($tableNames['permissions'], function (Blueprint $table) {
@@ -125,7 +125,7 @@ return new class extends Migration
         $tableNames = config('permission.table_names');
 
         if (empty($tableNames)) {
-            throw new \Exception('Error: config/permission.php not loaded. Run [php artisan config:clear] and try again.');
+            throw new Exception('Error: config/permission.php not loaded. Run [php artisan config:clear] and try again.');
         }
 
         Schema::drop($tableNames['role_has_permissions']);

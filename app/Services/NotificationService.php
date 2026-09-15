@@ -197,7 +197,7 @@ class NotificationService
     private function rowPayload($row): array
     {
         return [
-            'ticket_name' => $row->ticket?->name ?? 'Ticket',
+            'ticket_name' => $row->ticket->name ?? 'Ticket',
             'attendee_name' => $row->attendee_name,
             'code' => $row->ticket_code,
         ];

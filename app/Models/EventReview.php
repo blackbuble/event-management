@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EventReview extends Model
 {
@@ -21,12 +22,18 @@ class EventReview extends Model
         'created_at' => 'datetime',
     ];
 
-    public function event()
+    /**
+     * @return BelongsTo<Event, $this>
+     */
+    public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
     }
 
-    public function user()
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
